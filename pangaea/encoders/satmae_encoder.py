@@ -36,11 +36,19 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
 
         self.in_c = in_chans
         self.patch_size = patch_size
-        self.img_size = img_size # ADDED
         self.channel_groups = channel_groups
         self.spatial_mask = spatial_mask  # Whether to mask all channels of same spatial location
         num_groups = len(channel_groups)
-        self.output_layers = output_layers # ADDED
+        
+        # ADDED AS PART OF THE INTEGRATION INTO PANGAEA
+        self.embed_dim = embed_dim
+        self.depth = depth
+        self.num_heads = num_heads
+        self.mlp_ratio = mlp_ratio
+        self.channel_embed = channel_embed
+        self.img_size = img_size
+        self.output_layers = output_layers
+
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
@@ -59,7 +67,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for i in range(depth)])
 
-        ### REMOVED A VARIABLE "qk_scale=None" THAT SEEMED TO NOT EXIST ANYMORE
+        ### REMOVED A VARIABLE "qk_scale=None" THAT SEEMED TO NOT EXIST ANYMORE; SEE ALSO https://github.com/facebookresearch/mae/issues/58
 
         self.norm = norm_layer(embed_dim)
         # --------------------------------------------------------------------------
@@ -259,17 +267,16 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         for i, blk in enumerate(self.blocks):
             x = blk(x)
             if i in self.output_layers:
-                print(x[:, 1:].permute(0, 2, 1).shape)
                 out = (
                     x[:, 1:]
                     .permute(0, 2, 1)
-                    .reshape(
+                    .contiguous()
+                    .view(               # OTHER ENCODERS HAVE ".contiguous()" AFTER ".view()", CHANGED POSITION TO BEFORE ACCORDING TO https://www.geeksforgeeks.org/how-does-the-view-method-work-in-python-pytorch/  -  THROWS AN ERROR OTHERWISE "RuntimeError: view size is not compatible with input tensor's size and stride (at least one dimension spans across two contiguous subspaces). Use .reshape(...) instead."
                         x.shape[0],
                         -1,
                         self.img_size // self.patch_size,
                         self.img_size // self.patch_size,
                     )
-                    .contiguous()
                 )
                 output.append(out)
 
@@ -381,6 +388,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
 class SatMAE(Encoder):
     def __init__(
         self,
+        model_name:str,
         encoder_weights: str | Path,
         input_size: int,
         input_bands: dict[str, list[str]],
@@ -399,7 +407,7 @@ class SatMAE(Encoder):
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
     ):
         super().__init__(
-            model_name="my_model_name",
+            model_name=model_name,
             encoder_weights=encoder_weights,
             input_bands=input_bands,
             input_size=input_size,
@@ -413,9 +421,9 @@ class SatMAE(Encoder):
         )
 
         # initiate variables
+        self.model_name=model_name
         self.patch_size = patch_size
         self.img_size = input_size
-        ### self.input_res = torch.tensor([input_res]).float().cpu()    IS THIS EVEN NEEDED??? JUST COPY PASTED FROM SCALEMAE
         self.in_chans = in_chans
         self.output_layers=output_layers
         self.channel_embed = channel_embed
@@ -424,25 +432,29 @@ class SatMAE(Encoder):
         self.num_heads = num_heads
         self.mlp_ratio = mlp_ratio
         self.norm_layer = norm_layer
+    
 
         # define model - CONFIG ACCORDING TO .YAML FILE
-        self.model = MaskedAutoencoderGroupChannelViT(channel_embed=self.channel_embed, 
+        self.model = MaskedAutoencoderGroupChannelViT(img_size=self.img_size,
+                                                      channel_embed=self.channel_embed, 
                                                       embed_dim=self.embed_dim, 
                                                       depth=self.depth, 
                                                       num_heads=self.num_heads, 
                                                       mlp_ratio=self.mlp_ratio, 
                                                       norm_layer=self.norm_layer,
-                                                      output_layers=self.output_layers)
+                                                      output_layers=self.output_layers,
+                                                      patch_size=self.patch_size)
 
 
     # AS IN SCALEMAE & SPECTRALGPT
     def load_encoder_weights(self, logger: Logger) -> None:
+        # AS IN THE OTHER MODELS
         pretrained_model = torch.load(self.encoder_weights, map_location="cpu")["model"]
         k = pretrained_model.keys()
         pretrained_encoder = {}
         incompatible_shape = {}
         missing = {}
-        for name, param in self.named_parameters():
+        for name, param in self.model.named_parameters():
             if name not in k:
                 missing[name] = param.shape
             elif pretrained_model[name].shape != param.shape:
@@ -450,14 +462,14 @@ class SatMAE(Encoder):
             else:
                 pretrained_encoder[name] = pretrained_model[name]
 
-        self.load_state_dict(pretrained_encoder, strict=False)
+        self.model.load_state_dict(pretrained_encoder, strict=False)
         self.parameters_warning(missing, incompatible_shape, logger)
-
+        
 
     def forward(self, image) -> list[torch.Tensor]:
 
-        # x IS A DICT -> EXTRACT RIGHT TENSOR
-        x = image["optical"]
+        # x IS A DICT -> EXTRACT RIGHT TENSOR & SQUEEZE ANY UNNECESSARY LAYERS
+        x = image["optical"].squeeze(2)
 
         # GET RESULT FROM THE FORWARD FUNCTION ABOVE
         result = self.model.forward_encoder(x=x,mask_ratio=0)
