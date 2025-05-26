@@ -385,7 +385,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         return loss, pred, mask
     '''
 
-class SatMAE(Encoder):
+class SatMAE_Base(Encoder):
     def __init__(
         self,
         model_name:str,
