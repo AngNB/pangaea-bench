@@ -6,7 +6,7 @@ download_url: https://zenodo.org/record/7338613/files/pretrain-vit-base-e199.pth
 
 model_name: SatMAE
 
-input_size: 96 #224   # corresponds to "img_size" (inferred by looking at the code from SaaleMAE "img_size=input_size") => # from https://github.com/sustainlab-group/SatMAE?tab=readme-ov-file#pretraining-1, not DEFAULT value for the model on SatMAE GitHub (was 224 but didnt work)
+input_size: 96 #224   # corresponds to "img_size" (inferred by looking at the code from ScaleMAE "img_size=input_size") => # from https://github.com/sustainlab-group/SatMAE?tab=readme-ov-file#pretraining-1, not DEFAULT value for the model on SatMAE GitHub (was 224 but didnt work)
 in_chans: 3      # Number of groups -> see Code in SatMAE GitHub => channel_groups=((0, 1, 2, 6), (3, 4, 5, 7), (8, 9))
 embed_dim: 768   # From Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on SatMAE GitHub
 patch_size: 8    # from https://github.com/sustainlab-group/SatMAE?tab=readme-ov-file#pretraining-1, not DEFAULT value for the model on SatMAE GitHub (was 16 but didnt work)
@@ -18,18 +18,19 @@ mlp_ratio: 4.     # From Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on Sa
 channel_embed: 256
 qkv_bias: True    # ScaleMAE -> CHECK
 
-input_bands:      # channel_groups=((0, 1, 2, 6), (3, 4, 5, 7), (8, 9)); ??? EXPLAIN HOW NUMBERS GO WITH THE NAMES BELOW?
+input_bands:      # channel_groups=((0, 1, 2, 6), (3, 4, 5, 7), (8, 9)); 
+#Source: From the paper https://arxiv.org/pdf/2207.08051 => "Model configuration As not all of the 13 Sentinel-2 bands may be useful, in our experiments we drop bands B1, B9 and B10, which correspond to a spatial resolution of 60m. Of the remaining 10 bands, we form three groups: (i) RGB+NIR: B2, B3, B4, B8 (ii) Red Edge: B5, B6, B7, B8A (iii) SWIR: B11, B12. We choose this grouping to ensure each group has bands of the same spatial resolution and similar wavelength (see A.2.2, A.6).""
   optical:
-    - B2
-    - B3
-    - B4
-    - B8
-    - B5
-    - B6
-    - B7
-    - B8A
-    - B11
-    - B12
+    - B2    # 0
+    - B3    # 1
+    - B4    # 2
+    - B5    # 3
+    - B6    # 4
+    - B7    # 5
+    - B8    # 6
+    - B8A   # 7
+    - B11   # 8
+    - B12   # 9
 
 output_layers:    # ??? Default ones accroding to PANGAEA GitHub. 3,5,7,11
   - 3
