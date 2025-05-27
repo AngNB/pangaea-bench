@@ -54,7 +54,7 @@ REF_BIOMES = {
 
 # --- Begin copied helper functions from AGBD/Models/dataset.py ---
 def initialize_index(fnames, mode, chunk_size, path_mapping, path_h5):
-    with open(join(path_mapping, 'biomes_splits_to_name.pkl'), 'rb') as f:
+    with open(join('/cluster/work/igp_psr/gsialelli/Data/AGB/', 'biomes_splits_to_name.pkl'), 'rb') as f:
         tile_mapping = pickle.load(f)
     idx = {}
     for fname in fnames:
@@ -181,7 +181,7 @@ class AGBD(Dataset):
         # This is a regression dataset, so set num_classes to 1
         self.num_classes = 1
         # Use only biomes_splits_to_name.pkl for split logic
-        mapping_path = join(root_path, 'biomes_splits_to_name.pkl')
+        mapping_path = join('/cluster/work/igp_psr/gsialelli/Data/AGB/', 'biomes_splits_to_name.pkl')
         with open(mapping_path, 'rb') as f:
             tile_mapping = pickle.load(f)
         self.split_tiles = set(tile_mapping[split])
