@@ -402,6 +402,7 @@ class SatMAE_Base(Encoder):
         depth: int,
         num_heads: int,
         mlp_ratio: float,
+        mask_ratio: float,
         qkv_bias: bool,
         pyramid_output: bool,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
@@ -432,6 +433,7 @@ class SatMAE_Base(Encoder):
         self.num_heads = num_heads
         self.mlp_ratio = mlp_ratio
         self.norm_layer = norm_layer
+        self.mask_ratio = mask_ratio
     
 
         # define model - CONFIG ACCORDING TO .YAML FILE
@@ -472,6 +474,5 @@ class SatMAE_Base(Encoder):
         x = image["optical"].squeeze(2)
 
         # GET RESULT FROM THE FORWARD FUNCTION ABOVE
-        result = self.model.forward_encoder(x=x,mask_ratio=0)
-
+        result = self.model.forward_encoder(x=x,mask_ratio=self.mask_ratio) # Default value in SatMAE GitHub
         return result
