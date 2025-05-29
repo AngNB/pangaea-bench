@@ -451,7 +451,7 @@ class SatMAE_Base(Encoder):
     # AS IN SCALEMAE & SPECTRALGPT
     def load_encoder_weights(self, logger: Logger) -> None:
         # AS IN THE OTHER MODELS
-        pretrained_model = torch.load(self.encoder_weights, map_location="cpu")["model"]
+        pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)["model"]  ### ADD weights_only=False DUE TO "FutureWarning"
         k = pretrained_model.keys()
         pretrained_encoder = {}
         incompatible_shape = {}
