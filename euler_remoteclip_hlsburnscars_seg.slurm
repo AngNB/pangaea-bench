@@ -1,13 +1,13 @@
 #!/bin/bash
 #SBATCH --account=es_schin
 #SBATCH --ntasks=1
+#SBATCH --cpus-per-task=4
 #SBATCH --gpus=1
 #SBATCH --gres=gpumem:20g
-#SBATCH --time=30:00:00
-#SBATCH --job-name=satmae_agbd_reg_batch_64_and_32
+#SBATCH --time=00:20:00
+#SBATCH --job-name=satmae_hlsburnscars_seg
 #SBATCH --mail-type=BEGIN,END
-#SBATCH --mem-per-cpu=8G
-#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=4096
 
 source /cluster/scratch/anogueira/miniconda3/bin/activate
 conda init --all
@@ -28,12 +28,10 @@ echo "GPU info:" && nvidia-smi
 
 torchrun --nnodes=1 --nproc_per_node=1 --rdzv-backend=c10d --rdzv-endpoint=localhost:0 pangaea/run.py \
     --config-name=train \
-    dataset=agbd \
-    encoder=satmae_base \
-    decoder=reg_upernet \
-    preprocessing=reg_resize \
-    criterion=mse \
-    task=regression \
-    use_wandb=True \
-    batch_size=64 \
-    test_batch_size=32
+    dataset=hlsburnscars \
+    encoder=remoteclip \
+    decoder=seg_upernet\
+    preprocessing=seg_default \
+    criterion=cross_entropy \
+    task=segmentation \
+    use_wandb=True
