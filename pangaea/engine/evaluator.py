@@ -215,8 +215,8 @@ class SegEvaluator(Evaluator):
             # ------------------------------ VISUALIZATION ------------------------------
             # SAVE SOME INTERMEDIATE RESULTS (ONLY PREDS THAT HAVE VALID VALUES ONLY AND IF WANDB IS ACTIVATED)
             if torch.all(torch.flatten(valid_mask)) and self.use_wandb and self.rank == 0:
-                # JUST SAVE IMAGES IN BATCH=30 AND ONLY FOR THE EPOCHS: {5, 10, 30, 60} ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only all 5 epochs)
-                if (batch_idx == 30 and (model_name == "epoch 5" or model_name == "epoch 10" or model_name == "epoch 30" or model_name == "epoch 60")) or ((batch_idx % 15 == 0) and model_name == "checkpoint__best"):
+                # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
+                if (batch_idx == 0 and (model_name == "epoch 5" or model_name == "epoch 10" or model_name == "epoch 30" or model_name == "epoch 60")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 ) and model_name == "checkpoint__best"):
                     # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
                     pred_saved = pred.clone()
                     target_saved = target.clone()
@@ -231,8 +231,8 @@ class SegEvaluator(Evaluator):
                     # LOG INTO WANDB AFTER RESHAPING
                     img_pred = wandb.Image(pred_np.reshape((dim_2,dim_2)))
                     img_target = wandb.Image(target_np.reshape((dim_2,dim_2)))
-                    
-                    # JUST SO THAT IMAGE DISPLAY ON WNADB IS SORTABLE
+
+                    # JUST SO THAT IMAGE DISPLAY ON WANDB IS SORTABLE
                     if len(str(batch_idx)) == 1:   
                         wandb.log({f"batch_00{batch_idx}_{model_name}_pred": img_pred})
                         wandb.log({f"batch_00{batch_idx}_{model_name}_target": img_target})
@@ -420,6 +420,37 @@ class RegEvaluator(Evaluator):
                 logits = model(image, output_shape=target.shape[-2:]).squeeze(dim=1)
             else:
                 raise NotImplementedError((f"Inference mode {self.inference_mode} is not implemented."))
+
+            # ------------------------------ VISUALIZATION ------------------------------
+            # SAVE SOME INTERMEDIATE RESULTS (ONLY PREDS THAT HAVE VALID VALUES ONLY AND IF WANDB IS ACTIVATED)
+            if self.use_wandb and self.rank == 0:
+                # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
+                if (batch_idx == 0 and (model_name == "epoch 0" or model_name == "epoch 10" or model_name == "epoch 30" or model_name == "epoch 60")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 ) and model_name == "checkpoint__best"):
+                    # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
+                    pred_saved = logits.clone() # BOTH ARE 2D TENSORS - NO NEED TO RESHAPE AS IN THE "SegEvaluator()"
+                    target_saved = target.clone()
+                    
+                    # TRANSFORM TO NUMPY
+                    pred_np = pred_saved.cpu().numpy()
+                    target_np = target_saved.cpu().numpy()
+                    
+                    # LOG INTO WANDB AFTER RESHAPING
+                    img_pred = wandb.Image(pred_np)
+                    img_target = wandb.Image(target_np)
+
+                    # JUST SO THAT IMAGE DISPLAY ON WANDB IS SORTABLE
+                    if len(str(batch_idx)) == 1:   
+                        wandb.log({f"batch_00{batch_idx}_{model_name}_pred": img_pred})
+                        wandb.log({f"batch_00{batch_idx}_{model_name}_target": img_target})
+                    elif len(str(batch_idx)) == 2:   
+                        wandb.log({f"batch_0{batch_idx}_{model_name}_pred": img_pred})
+                        wandb.log({f"batch_0{batch_idx}_{model_name}_target": img_target})
+                    else:   
+                        wandb.log({f"batch_{batch_idx}_{model_name}_pred": img_pred})
+                        wandb.log({f"batch_{batch_idx}_{model_name}_target": img_target})
+                    
+
+            # ------------------------------ VISUALIZATION ------------------------------
 
             mse += F.mse_loss(logits, target)
 
