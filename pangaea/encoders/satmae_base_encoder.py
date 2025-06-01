@@ -474,5 +474,5 @@ class SatMAE_Base(Encoder):
         x = image["optical"].squeeze(2)
 
         # GET RESULT FROM THE FORWARD FUNCTION ABOVE
-        result = self.model.forward_encoder(x=x,mask_ratio=self.mask_ratio) # Default value in SatMAE GitHub
+        result = self.model.forward_encoder(x=x,mask_ratio=self.mask_ratio)
         return result
