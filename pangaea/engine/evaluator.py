@@ -9,7 +9,9 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-import numpy as np # ADDED FOR VISUALIZATION PURPOSES, SEE BELOW
+
+# ADDED FOR VISUALIZATION PURPOSES, SEE BELOW
+import numpy as np
 
 
 class Evaluator:
@@ -421,38 +423,73 @@ class RegEvaluator(Evaluator):
             else:
                 raise NotImplementedError((f"Inference mode {self.inference_mode} is not implemented."))
 
+
+            # FOR AGBD: CALCULATE CENTRAL PIXEL AND COMPUTE MSE ONLY ON CENTRAL PIXEL
+            
+            pxl = int(logits.shape[1]/2) # CENTRAL PIXEL, ASSUMPTION: IMAGE SIZES ARE THE ORIGINAL SIZES (NO RESCALING WHEN EVALUATION) & HEIGHT=WIDTH
+
+            mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
+            
             # ------------------------------ VISUALIZATION ------------------------------
-            # SAVE SOME INTERMEDIATE RESULTS (ONLY PREDS THAT HAVE VALID VALUES ONLY AND IF WANDB IS ACTIVATED)
+            # SAVE SOME INTERMEDIATE RESULTS (IF WANDB IS ACTIVATED)
             if self.use_wandb and self.rank == 0:
                 # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
-                if (batch_idx == 0 and (model_name == "epoch 0" or model_name == "epoch 10" or model_name == "epoch 30" or model_name == "epoch 60")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 ) and model_name == "checkpoint__best"):
+                if (batch_idx == 0 and (model_name == "epoch 0" or model_name == "epoch 30")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 ) and model_name == "checkpoint__best"):
                     # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
-                    pred_saved = logits.clone() # BOTH ARE 2D TENSORS - NO NEED TO RESHAPE AS IN THE "SegEvaluator()"
+                    pred_saved = logits.clone()
                     target_saved = target.clone()
                     
+                    # CROP TO SHOW ONLY FEW PIXELS AROUND CENTRAL PIXEL
+                    pred_saved_cropped = pred_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
+                    target_saved_cropped = target_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
+
+                    # ONLY SHOW CENTRAL PIXEL -> MASK THE REST
+                    logits_pxl = pred_saved[0,pxl,pxl]
+                    target_pxl = target_saved[0,pxl,pxl]
+                    
+                    pred_saved_masked = torch.zeros((pred_saved[0,:,:].shape))
+                    target_saved_masked = torch.zeros((target_saved[0,:,:].shape))
+
+                    pred_saved_masked[pxl,pxl] = logits_pxl
+                    target_saved_masked[pxl,pxl] = target_pxl
+
+                    pred_saved_masked = pred_saved_masked[pxl-3:pxl+4,pxl-3:pxl+4]
+                    target_saved_masked = target_saved_masked[pxl-3:pxl+4,pxl-3:pxl+4]
+
                     # TRANSFORM TO NUMPY
                     pred_np = pred_saved.cpu().numpy()
                     target_np = target_saved.cpu().numpy()
+                    pred_saved_cropped_np = pred_saved_cropped.cpu().numpy()
+                    target_saved_cropped_np = target_saved_cropped.cpu().numpy()
+                    pred_saved_masked_np = pred_saved_masked.cpu().numpy()
+                    target_saved_masked_np = target_saved_masked.cpu().numpy()
                     
-                    # LOG INTO WANDB AFTER RESHAPING
-                    img_pred = wandb.Image(pred_np)
-                    img_target = wandb.Image(target_np)
+                    # LOG INTO WANDB AFTER SLICING (TENSOR IS 3D, TAKE ANY IMAGE)
+                    img_pred = wandb.Image(pred_np[0,:,:], caption="prediction")
+                    img_target = wandb.Image(target_np[0,:,:], caption="ground truth")
 
-                    # JUST SO THAT IMAGE DISPLAY ON WANDB IS SORTABLE
+                    img_pred_zoomed = wandb.Image(pred_saved_cropped_np, caption="prediction (zoomed)")
+                    img_target_zoomed = wandb.Image(target_saved_cropped_np, caption="ground truth (zoomed)")
+
+                    img_pred_masked = wandb.Image(pred_saved_masked_np, caption="prediction (masked)")
+                    img_target_masked = wandb.Image(target_saved_masked_np, caption="ground truth (masked)")
+
+                    # ADAPT NAMING SO THAT IMAGE DISPLAY ON WANDB IS SORTABLE
                     if len(str(batch_idx)) == 1:   
-                        wandb.log({f"batch_00{batch_idx}_{model_name}_pred": img_pred})
-                        wandb.log({f"batch_00{batch_idx}_{model_name}_target": img_target})
+                        wandb.log({f"batch_00{batch_idx}_{model_name}": (img_pred, img_target)})
+                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
+                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
                     elif len(str(batch_idx)) == 2:   
-                        wandb.log({f"batch_0{batch_idx}_{model_name}_pred": img_pred})
-                        wandb.log({f"batch_0{batch_idx}_{model_name}_target": img_target})
+                        wandb.log({f"batch_0{batch_idx}_{model_name}": (img_pred, img_target)})
+                        wandb.log({f"batch_0{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
+                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
                     else:   
-                        wandb.log({f"batch_{batch_idx}_{model_name}_pred": img_pred})
-                        wandb.log({f"batch_{batch_idx}_{model_name}_target": img_target})
-                    
+                        wandb.log({f"batch_{batch_idx}_{model_name}": (img_pred, img_target)})
+                        wandb.log({f"batch_{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
+                        wandb.log({f"batch_{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
 
             # ------------------------------ VISUALIZATION ------------------------------
 
-            mse += F.mse_loss(logits, target)
 
         torch.distributed.all_reduce(mse, op=torch.distributed.ReduceOp.SUM)
         mse = mse / len(self.val_loader)
