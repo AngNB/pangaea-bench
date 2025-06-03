@@ -273,6 +273,9 @@ def main(cfg: DictConfig) -> None:
     # get datasets
     raw_test_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="test")
     test_dataset = GeoFMDataset(raw_test_dataset, test_preprocessor)
+    logger.info(
+            f"Total number of test patches: {len(test_dataset)}\n"
+    )
 
     test_loader = DataLoader(
         test_dataset,
