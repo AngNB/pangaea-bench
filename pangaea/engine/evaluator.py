@@ -426,7 +426,9 @@ class RegEvaluator(Evaluator):
 
             # FOR AGBD: CALCULATE CENTRAL PIXEL AND COMPUTE MSE ONLY ON CENTRAL PIXEL
             
-            pxl = int(logits.shape[1]/2) # CENTRAL PIXEL, ASSUMPTION: IMAGE SIZES ARE THE ORIGINAL SIZES (NO RESCALING WHEN EVALUATION) & HEIGHT=WIDTH
+            pxl = int(logits.shape[-1]/2) # CENTRAL PIXEL, ASSUMPTION: IMAGE SIZES ARE THE ORIGINAL SIZES (NO RESCALING WHEN EVALUATION) & HEIGHT=WIDTH
+
+            assert len(logits.shape)==3, "logits shape is not 3"
 
             mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
             
@@ -434,12 +436,13 @@ class RegEvaluator(Evaluator):
             # SAVE SOME INTERMEDIATE RESULTS (IF WANDB IS ACTIVATED)
             if self.use_wandb and self.rank == 0:
                 # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
-                if (batch_idx == 0 and (model_name == "epoch 0" or model_name == "epoch 30")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 ) and model_name == "checkpoint__best"):
+                if ((batch_idx == 0 or batch_idx == 30) and (model_name == "epoch 0" or model_name == "epoch 3" or model_name == "epoch 5")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 or batch_idx == 120 or batch_idx == 300 or batch_idx == 3000 ) and model_name == "checkpoint__best"):
+
                     # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
                     pred_saved = logits.clone()
                     target_saved = target.clone()
                     
-                    # CROP TO SHOW ONLY FEW PIXELS AROUND CENTRAL PIXEL
+                    # CROP TO SHOW ONLY FEW PIXELS AROUND CENTRAL PIXEL; RANDOMLY JUST PIC THE FIRST IMAGE IN THE BATCH (anticipating different batch sizes)
                     pred_saved_cropped = pred_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
                     target_saved_cropped = target_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
 
