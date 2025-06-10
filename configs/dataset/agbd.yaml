@@ -1,9 +1,9 @@
 _target_: pangaea.datasets.agbd.AGBD
 dataset_name: AGBD
-root_path: /cluster/work/igp_psr/gsialelli/Data/patches/
-hdf5_dir: /cluster/work/igp_psr/gsialelli/Data/patches/
+root_path: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
+hdf5_dir: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
 hdf5_pattern: data_subset-*-v4_*-20.h5
-split_files: /cluster/work/igp_psr/gsialelli/Data/patches/
+split_files: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
 label_group: GEDI
 label_name: agbd
 
