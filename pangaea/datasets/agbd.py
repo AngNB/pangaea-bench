@@ -54,7 +54,7 @@ REF_BIOMES = {
 
 # --- Begin copied helper functions from AGBD/Models/dataset.py ---
 def initialize_index(fnames, mode, chunk_size, path_mapping, path_h5):
-    with open(join('/cluster/work/igp_psr/gsialelli/Data/AGB/', 'biomes_splits_to_name.pkl'), 'rb') as f:
+    with open(join(path_mapping, 'biomes_splits_to_name.pkl'), 'rb') as f:
         tile_mapping = pickle.load(f)
     idx = {}
     for fname in fnames:
@@ -181,7 +181,7 @@ class AGBD(Dataset):
         # This is a regression dataset, so set num_classes to 1
         self.num_classes = 1
         # Use only biomes_splits_to_name.pkl for split logic
-        mapping_path = join('/cluster/work/igp_psr/gsialelli/Data/AGB/', 'biomes_splits_to_name.pkl')
+        mapping_path = join(self.root_path, 'biomes_splits_to_name.pkl')
         with open(mapping_path, 'rb') as f:
             tile_mapping = pickle.load(f)
         self.split_tiles = set(tile_mapping[split])
@@ -276,10 +276,12 @@ class AGBD(Dataset):
         # Target
         agbd = f[tile_name]['GEDI']['agbd'][idx]
 
+        '''
         # --- PATCH: Normalize target to match original AGBD code (images all black otherwise! check this though TODO) ---
         target_mean = getattr(self, 'data_mean', {}).get('target', 66.97265625)
         target_std = getattr(self, 'data_std', {}).get('target', 98.66587829589844)
         agbd = (agbd - target_mean) / target_std
+        '''
         agbd = torch.full(self.patch_size, float(agbd), dtype=torch.float32)
         
         # Build image dictionary - stack and return in PANGAEA format (add time dimension T=1)
