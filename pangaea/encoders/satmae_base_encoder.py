@@ -424,7 +424,7 @@ class SatMAE_Base(Encoder):
         # initiate variables
         self.model_name=model_name
         self.patch_size = patch_size
-        self.img_size = input_size
+        self.input_size = input_size
         self.in_chans = in_chans
         self.output_layers=output_layers
         self.channel_embed = channel_embed
@@ -437,7 +437,7 @@ class SatMAE_Base(Encoder):
     
 
         # define model - CONFIG ACCORDING TO .YAML FILE
-        self.model = MaskedAutoencoderGroupChannelViT(img_size=self.img_size,
+        self.model = MaskedAutoencoderGroupChannelViT(img_size=self.input_size,
                                                       channel_embed=self.channel_embed, 
                                                       embed_dim=self.embed_dim, 
                                                       depth=self.depth, 
@@ -450,8 +450,8 @@ class SatMAE_Base(Encoder):
 
     # AS IN SCALEMAE & SPECTRALGPT
     def load_encoder_weights(self, logger: Logger) -> None:
-        # AS IN THE OTHER MODELS
-        pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)["model"]  ### ADD weights_only=False DUE TO "FutureWarning"
+        # load encoder weights, set weights_only=False due to "FutureWarning"
+        pretrained_model = torch.load(self.encoder_weights, map_location="cpu", weights_only=False)["model"]
         k = pretrained_model.keys()
         pretrained_encoder = {}
         incompatible_shape = {}
