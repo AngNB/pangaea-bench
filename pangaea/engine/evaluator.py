@@ -394,7 +394,7 @@ class RegEvaluator(Evaluator):
         t = time.time()
 
         if model_ckpt_path is not None:
-            model_dict = torch.load(model_ckpt_path, map_location=self.device)
+            model_dict = torch.load(model_ckpt_path, map_location=self.device, weights_only=False)
             model_name = os.path.basename(model_ckpt_path).split('.')[0]
             if 'model' in model_dict:
                 model.module.load_state_dict(model_dict["model"])
@@ -408,7 +408,7 @@ class RegEvaluator(Evaluator):
         tag = f'Evaluating {model_name} on {self.split} set'
 
         mse = torch.zeros(1, device=self.device)
-
+        mse_list=[]
         for batch_idx, data in enumerate(tqdm(self.val_loader, desc=tag)):
             image, target = data['image'], data['target']
             image = {k: v.to(self.device) for k, v in image.items()}
@@ -428,15 +428,36 @@ class RegEvaluator(Evaluator):
             
             pxl = int(logits.shape[-1]/2) # CENTRAL PIXEL, ASSUMPTION: IMAGE SIZES ARE THE ORIGINAL SIZES (NO RESCALING WHEN EVALUATION) & HEIGHT=WIDTH
 
-            assert len(logits.shape)==3, "logits shape is not 3"
+            assert len(logits.shape)==3, f"logits shape in evaluator.py is not 3; it is {logits.shape}"
+            assert len(target.shape)==3, f"target shape in evaluator.py is not 3; it is {target.shape}"
 
-            mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
-            
+            mse_list.append(F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl]))
+            mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])            
+
+
+
+            mse_to_print = F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
+            rmse_to_print = torch.sqrt(mse_to_print)
+            self.logger.info(f"Metrics for batch with index {batch_idx}: ------ {self.split}_MSE: {mse_to_print} ------ ------ {self.split}_RMSE: {rmse_to_print}")
+
             # ------------------------------ VISUALIZATION ------------------------------
             # SAVE SOME INTERMEDIATE RESULTS (IF WANDB IS ACTIVATED)
             if self.use_wandb and self.rank == 0:
-                # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
-                if ((batch_idx == 0 or batch_idx == 30) and (model_name == "epoch 0" or model_name == "epoch 3" or model_name == "epoch 5")) or ((batch_idx == 0 or batch_idx == 5 or batch_idx == 10 or batch_idx == 15 or batch_idx == 30 or batch_idx == 120 or batch_idx == 300 or batch_idx == 3000 ) and model_name == "checkpoint__best"):
+                # SAVE MSE AND RMSE VALUES DURING EVALUATION                
+            
+                #wandb.define_metric(step_metric="batch_idx", name = "test_MSE")
+                #wandb.log({"batch_idx": batch_idx, "test_MSE":mse_to_print})
+
+                #wandb.define_metric(step_metric="batch_idx", name = "test_RMSE")
+                #wandb.log({"batch_idx": batch_idx, "test_MSE":rmse_to_print})
+
+                wandb.log({f"{self.split}_MSE_per_batch": mse_to_print, f"{self.split}_RMSE_per_batch": rmse_to_print})
+
+
+                
+
+                # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR SPECIFIC EPOCHS (it has to be multiple of 5, since Evaluation only for all 5 epochs);
+                if ((batch_idx % 300 == 0) and model_name == "epoch 0") or ((batch_idx % 120 == 0) and (model_name == "epoch 5")) or ((batch_idx % 120 == 0) and model_name == "checkpoint__best"):
 
                     # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
                     pred_saved = logits.clone()
@@ -468,35 +489,41 @@ class RegEvaluator(Evaluator):
                     target_saved_masked_np = target_saved_masked.cpu().numpy()
                     
                     # LOG INTO WANDB AFTER SLICING (TENSOR IS 3D, TAKE ANY IMAGE)
-                    img_pred = wandb.Image(pred_np[0,:,:], caption="prediction")
-                    img_target = wandb.Image(target_np[0,:,:], caption="ground truth")
+                    img_pred = wandb.Image(pred_np[0,:,:], caption=f"prediction (value: {logits_pxl:.3f})")
+                    img_target = wandb.Image(target_np[0,:,:], caption=f"ground truth (value: {target_pxl:.3f})")
 
-                    img_pred_zoomed = wandb.Image(pred_saved_cropped_np, caption="prediction (zoomed)")
-                    img_target_zoomed = wandb.Image(target_saved_cropped_np, caption="ground truth (zoomed)")
+                    img_pred_zoomed = wandb.Image(pred_saved_cropped_np, caption=f"prediction (zoomed) (value: {logits_pxl:.3f})")
+                    img_target_zoomed = wandb.Image(target_saved_cropped_np, caption=f"ground truth (zoomed) (value: {target_pxl:.3f})")
 
-                    img_pred_masked = wandb.Image(pred_saved_masked_np, caption="prediction (masked)")
-                    img_target_masked = wandb.Image(target_saved_masked_np, caption="ground truth (masked)")
+                    img_pred_masked = wandb.Image(pred_saved_masked_np, caption=f"prediction (masked) (value: {logits_pxl:.3f})")
+                    img_target_masked = wandb.Image(target_saved_masked_np, caption=f"ground truth (masked) (value: {target_pxl:.3f})")
 
-                    # ADAPT NAMING SO THAT IMAGE DISPLAY ON WANDB IS SORTABLE
-                    if len(str(batch_idx)) == 1:   
-                        wandb.log({f"batch_00{batch_idx}_{model_name}": (img_pred, img_target)})
-                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
-                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
-                    elif len(str(batch_idx)) == 2:   
-                        wandb.log({f"batch_0{batch_idx}_{model_name}": (img_pred, img_target)})
-                        wandb.log({f"batch_0{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
-                        wandb.log({f"batch_00{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
-                    else:   
-                        wandb.log({f"batch_{batch_idx}_{model_name}": (img_pred, img_target)})
-                        wandb.log({f"batch_{batch_idx}_{model_name}_zoomed": (img_pred_zoomed, img_target_zoomed)})
-                        wandb.log({f"batch_{batch_idx}_{model_name}_zoomed_masked": (img_pred_masked, img_target_masked)})
+                    # save image inputs separately per Band
+                    image_squeezed = image["optical"].squeeze().clone()
+
+                    imgs_bands = []
+                    bands_for_img = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12']
+                    for i in range(image_squeezed.shape[1]):
+                        image_saved = image_squeezed[0,i,:,:]
+                        image_np = image_saved.cpu().numpy()
+                        img_image = wandb.Image(image_np, caption=f"Original Image (Band {bands_for_img[i]} if SatMAE)")
+                        imgs_bands.append(img_image)
+
+                    wandb.log({f"batch_{batch_idx}_{model_name}: mse = {mse_to_print:.3f}": (img_pred, img_target)})
+                    wandb.log({f"batch_{batch_idx}_{model_name}_zoomed: mse = {mse_to_print:.3f}": (img_pred_zoomed, img_target_zoomed)})
+                    wandb.log({f"batch_{batch_idx}_{model_name}_zoomed_masked: mse = {mse_to_print:.3f}": (img_pred_masked, img_target_masked)})
+                    wandb.log({f"batch_{batch_idx}_{model_name}: Inputs": (imgs_bands)})
+
 
             # ------------------------------ VISUALIZATION ------------------------------
 
 
         torch.distributed.all_reduce(mse, op=torch.distributed.ReduceOp.SUM)
+        print("MSE values:", mse_list)
+        print("MSE before division:", mse)
         mse = mse / len(self.val_loader)
-
+        print("MSE after division:", mse)
+        exit()
         metrics = {"MSE": mse.item(), "RMSE": torch.sqrt(mse).item()}
         self.log_metrics(metrics)
 
