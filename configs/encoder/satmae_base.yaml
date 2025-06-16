@@ -14,7 +14,7 @@ patch_size: 8     # from https://github.com/sustainlab-group/SatMAE?tab=readme-o
 num_heads: 12     # From Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on SatMAE GitHub
 depth: 12         # From Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on SatMAE GitHub
 mlp_ratio: 4.     # From Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on SatMAE GitHub
-mask_ratio: 0      # 0.75
+mask_ratio: 0     # 0.75
 # Further variables from Config "mae_vit_base_patch16_dec512d8b(**kwargs)" on SatMAE GitHub: (excluded all decoder related variables)
 channel_embed: 256
 qkv_bias: True    # ScaleMAE -> CHECK
