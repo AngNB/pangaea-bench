@@ -256,12 +256,22 @@ class BandPadding(BasePreprocessor):
 
             data["image"][k] = padded_image
         return data
+    
 
+    ### HERE MIGHT BE A MISTAKE - ALL THE BANDS ARE PADDED BEFORE THE VALUES OF EXISTING BANDS CAN BE SAVED SOMEWHERE - THAT IS WHY IT DISAPPEARS - PRE-SAVE VALUES AND THEN OVERWRITE LATER IN IF-CODE-BLOCK
     def update_meta(self, meta):
         """Tracking the meta statistics/info for next processor."""
         meta["data_bands"] = meta["encoder_bands"]
         for k in self.avail_bands_mask.keys():
             size = self.avail_bands_mask[k].shape
+    
+            # Pre-save the existing values
+            data_mean_meta = meta["data_mean"][k]
+            data_std_meta = meta["data_std"][k]
+            data_min_meta = meta["data_min"][k]
+            data_max_meta = meta["data_max"][k]
+
+            # Fill with zeros
             meta["data_mean"][k] = torch.full(
                 size, fill_value=self.fill_value, dtype=torch.float
             )
@@ -273,16 +283,16 @@ class BandPadding(BasePreprocessor):
                 size, fill_value=self.fill_value, dtype=torch.float
             )
             if self.used_bands_indices[k] is not None:
-                meta["data_mean"][k][self.avail_bands_mask[k]] = meta["data_mean"][k][
+                meta["data_mean"][k][self.avail_bands_mask[k]] = data_mean_meta[
                     self.used_bands_indices[k]
                 ]
-                meta["data_std"][k][self.avail_bands_mask[k]] = meta["data_std"][k][
+                meta["data_std"][k][self.avail_bands_mask[k]] = data_std_meta[
                     self.used_bands_indices[k]
                 ]
-                meta["data_min"][k][self.avail_bands_mask[k]] = meta["data_min"][k][
+                meta["data_min"][k][self.avail_bands_mask[k]] = data_min_meta[
                     self.used_bands_indices[k]
                 ]
-                meta["data_max"][k][self.avail_bands_mask[k]] = meta["data_max"][k][
+                meta["data_max"][k][self.avail_bands_mask[k]] = data_max_meta[
                     self.used_bands_indices[k]
                 ]
         return meta
@@ -670,9 +680,10 @@ class Resize(BasePreprocessor):
     def __init__(
         self,
         size: int | Sequence[int],
-        interpolation=T.InterpolationMode.BILINEAR,
+        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL, WAS BILINEAR
         antialias: Optional[bool] = True,
         resize_target: bool = True,
+        padding: bool = False,                      # PADDING ADDED
         **meta,
     ) -> None:
         """Initialize the Resize preprocessor.
@@ -701,6 +712,7 @@ class Resize(BasePreprocessor):
         self.interpolation = interpolation
         self.antialias = antialias
         self.resize_target = resize_target
+        self.padding=padding                        # PADDING ADDED
 
     def __call__(
         self, data: dict[str, torch.Tensor | dict[str, torch.Tensor]]
@@ -719,13 +731,26 @@ class Resize(BasePreprocessor):
             "target": torch.Tensor of shape (H W),
              "metadata": dict}.
         """
-        for k, v in data["image"].items():
-            data["image"][k] = TF.resize(
-                data["image"][k],
-                self.size,
-                interpolation=self.interpolation,
-                antialias=self.antialias,
-            )
+        # differentiate if padding or resizing with interpolation; key word is "self.padding" which is overwritten by PadToEncoder() in case of padding, default: False
+        if self.padding:
+            for k, v in data["image"].items():
+                original_data = data["image"][k]
+
+                original_size = list(original_data.shape)
+                new_size = original_size[:2] + list(self.size)
+                crop_size = original_size[-1]
+                # create tensor with right shape with zeros and overwrite all top left values with original data
+                data["image"][k] = torch.zeros(new_size, dtype=original_data.dtype, device = original_data.device)
+                data["image"][k][:,:,:crop_size,:crop_size] = original_data
+                
+        else:
+            for k, v in data["image"].items():
+                data["image"][k] = TF.resize(
+                    data["image"][k],
+                    self.size,
+                    interpolation=self.interpolation,
+                    antialias=self.antialias,
+                )
 
         if self.resize_target:
             if torch.is_floating_point(data["target"]):
@@ -752,9 +777,10 @@ class Resize(BasePreprocessor):
 class ResizeToEncoder(Resize):
     def __init__(
         self,
-        interpolation=T.InterpolationMode.BILINEAR,
+        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL, WAS BILINEAR
         antialias: Optional[bool] = True,
         resize_target: bool = False,
+        padding: bool = False,
         **meta,
     ) -> None:
         """Initialize the ResizeToEncoder preprocessor.
@@ -766,8 +792,68 @@ class ResizeToEncoder(Resize):
         meta: statistics/info of the input data and target encoder
         """
         size = meta["encoder_input_size"]
-        super().__init__(size, interpolation, antialias, resize_target, **meta)
 
+        super().__init__(size, interpolation, antialias, resize_target, padding=padding, **meta)   # PADDING ADDED
+
+# added a new class, allowing the padding of the image on right side and at the bottom to fit encoder input size
+class PadToEncoder(Resize):
+    def __init__(
+        self,
+        interpolation=T.InterpolationMode.BICUBIC,
+        antialias: Optional[bool] = True,
+        resize_target: bool = False,
+        padding: bool = True,
+        **meta,
+    ) -> None:
+        """Initialize the PadToEncoder preprocessor.
+        Args:
+        interpolation (InterpolationMode): Desired interpolation enum defined by
+            :class:`torchvision.transforms.InterpolationMode`.
+        antialias (bool, optional): Whether to apply antialiasing.
+        resize_target (bool, optional): Whether to resize the target
+        meta: statistics/info of the input data and target encoder
+        """
+        size = meta["encoder_input_size"]
+
+        super().__init__(size, interpolation, antialias, resize_target, padding=padding, **meta)
+
+class HorizontalFlip(BasePreprocessor):
+    def __init__(
+        self,
+        **meta,
+    ) -> None:
+        """Initialize the HorizontalFlip preprocessor.
+        Args:
+        self, the data
+        """        
+        super().__init__()
+
+    def __call__(
+        self, data: dict[str, torch.Tensor | dict[str, torch.Tensor]]
+    ) -> dict[str, torch.Tensor | dict[str, torch.Tensor]]:
+        """Flip the data randomly horizontically.
+        Args:
+            data (dict): input data.
+        Returns:
+            dict[str, torch.Tensor | dict[str, torch.Tensor]]: output dictionary following the format
+            {"image":{encoder_modality_1: torch.Tensor of shape (C T H W) (T=1 if single timeframe),
+                ...
+                encoder_modality_N: torch.Tensor of shape (C T H W) (T=1 if single timeframe),},
+            "target": torch.Tensor of shape (H W),
+             "metadata": dict}.
+        """
+        transform_method = T.RandomHorizontalFlip(p=1)
+
+        for k, v in data["image"].items():
+            data["image"][k] = transform_method(data["image"][k])
+        
+        data["target"] = transform_method(data["target"])
+        return data
+    
+    def update_meta(self, meta):
+        """Tracking the meta statistics/info for next processor - no need to change."""
+        return meta
+    
 
 class RandomResizedCrop(BasePreprocessor):
     def __init__(
@@ -953,4 +1039,3 @@ def _setup_size(size, error_msg):
         raise ValueError(error_msg)
 
     return size
-

@@ -10,8 +10,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-# ADDED FOR VISUALIZATION PURPOSES, SEE BELOW
-import numpy as np
+# added for visualization when regression
+import random
 
 
 class Evaluator:
@@ -394,7 +394,7 @@ class RegEvaluator(Evaluator):
         t = time.time()
 
         if model_ckpt_path is not None:
-            model_dict = torch.load(model_ckpt_path, map_location=self.device, weights_only=False)
+            model_dict = torch.load(model_ckpt_path, map_location=self.device, weights_only=False)  # added 'weights_only=False'
             model_name = os.path.basename(model_ckpt_path).split('.')[0]
             if 'model' in model_dict:
                 model.module.load_state_dict(model_dict["model"])
@@ -408,7 +408,7 @@ class RegEvaluator(Evaluator):
         tag = f'Evaluating {model_name} on {self.split} set'
 
         mse = torch.zeros(1, device=self.device)
-        mse_list=[]
+
         for batch_idx, data in enumerate(tqdm(self.val_loader, desc=tag)):
             image, target = data['image'], data['target']
             image = {k: v.to(self.device) for k, v in image.items()}
@@ -422,57 +422,32 @@ class RegEvaluator(Evaluator):
                 logits = model(image, output_shape=target.shape[-2:]).squeeze(dim=1)
             else:
                 raise NotImplementedError((f"Inference mode {self.inference_mode} is not implemented."))
-
-
-            # FOR AGBD: CALCULATE CENTRAL PIXEL AND COMPUTE MSE ONLY ON CENTRAL PIXEL
             
-            pxl = int(logits.shape[-1]/2) # CENTRAL PIXEL, ASSUMPTION: IMAGE SIZES ARE THE ORIGINAL SIZES (NO RESCALING WHEN EVALUATION) & HEIGHT=WIDTH
+            # for sparse mse, get central pixel assuming image height = image width and no rescaling
+            pxl = int(logits.shape[-1]/2)
+            
+            assert logits.shape == target.shape, f"Shape error in evaluator.py: logits.shape = {logits.shape} != target.shape {target.shape}"
 
-            assert len(logits.shape)==3, f"logits shape in evaluator.py is not 3; it is {logits.shape}"
-            assert len(target.shape)==3, f"target shape in evaluator.py is not 3; it is {target.shape}"
-
-            mse_list.append(F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl]))
-            mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])            
-
-
-
+            mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
             mse_to_print = F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
-            rmse_to_print = torch.sqrt(mse_to_print)
-            self.logger.info(f"Metrics for batch with index {batch_idx}: ------ {self.split}_MSE: {mse_to_print} ------ ------ {self.split}_RMSE: {rmse_to_print}")
 
             # ------------------------------ VISUALIZATION ------------------------------
-            # SAVE SOME INTERMEDIATE RESULTS (IF WANDB IS ACTIVATED)
-            if self.use_wandb and self.rank == 0:
-                # SAVE MSE AND RMSE VALUES DURING EVALUATION                
-            
-                #wandb.define_metric(step_metric="batch_idx", name = "test_MSE")
-                #wandb.log({"batch_idx": batch_idx, "test_MSE":mse_to_print})
-
-                #wandb.define_metric(step_metric="batch_idx", name = "test_RMSE")
-                #wandb.log({"batch_idx": batch_idx, "test_MSE":rmse_to_print})
-
-                wandb.log({f"{self.split}_MSE_per_batch": mse_to_print, f"{self.split}_RMSE_per_batch": rmse_to_print})
-
-
-                
-
-                # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR SPECIFIC EPOCHS (it has to be multiple of 5, since Evaluation only for all 5 epochs);
-                if ((batch_idx % 300 == 0) and model_name == "epoch 0") or ((batch_idx % 120 == 0) and (model_name == "epoch 5")) or ((batch_idx % 120 == 0) and model_name == "checkpoint__best"):
-
+            # save predicted values in testing phase, when best model with name "chechpoint__best" is called to evaluate on the test dataset (only when use_wandb=true)
+            if self.use_wandb and self.rank == 0 and (batch_idx % 120 == 0) and (model_name == "epoch 0" or model_name == "epoch 10" or model_name == "checkpoint__best"):
                     # CLONE PREDICTED AND GROUND TRUTH TENSORS, SO THAT ANY CHANGES DO NOT AFFECT ORIGINAL TENSOR
                     pred_saved = logits.clone()
                     target_saved = target.clone()
-                    
-                    # CROP TO SHOW ONLY FEW PIXELS AROUND CENTRAL PIXEL; RANDOMLY JUST PIC THE FIRST IMAGE IN THE BATCH (anticipating different batch sizes)
-                    pred_saved_cropped = pred_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
-                    target_saved_cropped = target_saved[0,pxl-3:pxl+4,pxl-3:pxl+4]
+
+                    # create index for random image in the batch
+                    max_batch_size = logits.shape[0]
+                    i = random.randint(0, max_batch_size)
 
                     # ONLY SHOW CENTRAL PIXEL -> MASK THE REST
-                    logits_pxl = pred_saved[0,pxl,pxl]
-                    target_pxl = target_saved[0,pxl,pxl]
+                    logits_pxl = pred_saved[i,pxl,pxl]
+                    target_pxl = target_saved[i,pxl,pxl]
                     
-                    pred_saved_masked = torch.zeros((pred_saved[0,:,:].shape))
-                    target_saved_masked = torch.zeros((target_saved[0,:,:].shape))
+                    pred_saved_masked = torch.zeros((pred_saved[i,:,:].shape))
+                    target_saved_masked = torch.zeros((target_saved[i,:,:].shape))
 
                     pred_saved_masked[pxl,pxl] = logits_pxl
                     target_saved_masked[pxl,pxl] = target_pxl
@@ -483,47 +458,24 @@ class RegEvaluator(Evaluator):
                     # TRANSFORM TO NUMPY
                     pred_np = pred_saved.cpu().numpy()
                     target_np = target_saved.cpu().numpy()
-                    pred_saved_cropped_np = pred_saved_cropped.cpu().numpy()
-                    target_saved_cropped_np = target_saved_cropped.cpu().numpy()
                     pred_saved_masked_np = pred_saved_masked.cpu().numpy()
                     target_saved_masked_np = target_saved_masked.cpu().numpy()
                     
                     # LOG INTO WANDB AFTER SLICING (TENSOR IS 3D, TAKE ANY IMAGE)
-                    img_pred = wandb.Image(pred_np[0,:,:], caption=f"prediction (value: {logits_pxl:.3f})")
-                    img_target = wandb.Image(target_np[0,:,:], caption=f"ground truth (value: {target_pxl:.3f})")
+                    img_pred = wandb.Image(pred_np[i,:,:], caption=f"prediction (value: {logits_pxl:.3f})")
+                    img_target = wandb.Image(target_np[i,:,:], caption=f"ground truth (value: {target_pxl:.3f})")
 
-                    img_pred_zoomed = wandb.Image(pred_saved_cropped_np, caption=f"prediction (zoomed) (value: {logits_pxl:.3f})")
-                    img_target_zoomed = wandb.Image(target_saved_cropped_np, caption=f"ground truth (zoomed) (value: {target_pxl:.3f})")
+                    img_pred_masked = wandb.Image(pred_saved_masked_np, caption=f"prediction (masked, zoomed) (value: {logits_pxl:.3f})")
+                    img_target_masked = wandb.Image(target_saved_masked_np, caption=f"ground truth (masked, zoomed) (value: {target_pxl:.3f})")
 
-                    img_pred_masked = wandb.Image(pred_saved_masked_np, caption=f"prediction (masked) (value: {logits_pxl:.3f})")
-                    img_target_masked = wandb.Image(target_saved_masked_np, caption=f"ground truth (masked) (value: {target_pxl:.3f})")
-
-                    # save image inputs separately per Band
-                    image_squeezed = image["optical"].squeeze().clone()
-
-                    imgs_bands = []
-                    bands_for_img = ['B2','B3','B4','B5','B6','B7','B8','B8A','B11','B12']
-                    for i in range(image_squeezed.shape[1]):
-                        image_saved = image_squeezed[0,i,:,:]
-                        image_np = image_saved.cpu().numpy()
-                        img_image = wandb.Image(image_np, caption=f"Original Image (Band {bands_for_img[i]} if SatMAE)")
-                        imgs_bands.append(img_image)
-
-                    wandb.log({f"batch_{batch_idx}_{model_name}: mse = {mse_to_print:.3f}": (img_pred, img_target)})
-                    wandb.log({f"batch_{batch_idx}_{model_name}_zoomed: mse = {mse_to_print:.3f}": (img_pred_zoomed, img_target_zoomed)})
-                    wandb.log({f"batch_{batch_idx}_{model_name}_zoomed_masked: mse = {mse_to_print:.3f}": (img_pred_masked, img_target_masked)})
-                    wandb.log({f"batch_{batch_idx}_{model_name}: Inputs": (imgs_bands)})
-
+                    wandb.log({f"batch_{batch_idx}_{model_name}_#{i}: MSE = {mse_to_print:.3f}": (img_pred, img_target, img_pred_masked, img_target_masked)})
 
             # ------------------------------ VISUALIZATION ------------------------------
 
 
         torch.distributed.all_reduce(mse, op=torch.distributed.ReduceOp.SUM)
-        print("MSE values:", mse_list)
-        print("MSE before division:", mse)
         mse = mse / len(self.val_loader)
-        print("MSE after division:", mse)
-        exit()
+
         metrics = {"MSE": mse.item(), "RMSE": torch.sqrt(mse).item()}
         self.log_metrics(metrics)
 
@@ -542,4 +494,4 @@ class RegEvaluator(Evaluator):
         self.logger.info(header + mse + rmse)
 
         if self.use_wandb and self.rank == 0:
-            wandb.log({f"{self.split}_MSE": metrics["MSE"], f"{self.split}_RMSE": metrics["RMSE"]})
+            wandb.log({f"{self.split}_MSE (mean over test batches)": metrics["MSE"], f"{self.split}_RMSE (mean over test batches)": metrics["RMSE"]})
