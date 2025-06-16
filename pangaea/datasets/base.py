@@ -187,9 +187,10 @@ class GeoFMDataset(Dataset):
              "metadata": dict}.
         """
 
+        # dataset class is called and get_item function is called
         output = self.raw_dataset[i // self.replicate]
+        # pre-process the item, only after pre-processor has been instatiated, data_preprocessor.py is called
         if self.preprocessor is not None:
             output = self.preprocessor(output)
 
         return output
-
