@@ -14,7 +14,7 @@ DO NOT MODIFY unless you have read both the AGBD and PANGAEA documentation and u
 # TODO clean up imports, remove unused ones
 import h5py
 import torch
-from torch.utils.data import Dataset
+from pangaea.datasets.base import RawGeoFMDataset
 import numpy as np
 from os.path import join, exists
 import pickle
