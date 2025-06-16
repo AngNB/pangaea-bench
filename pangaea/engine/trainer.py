@@ -86,6 +86,8 @@ class Trainer:
         ], f"Invalid precision {precision}, use 'fp32', 'fp16' or 'bfp16'."
         self.enable_mixed_precision = precision != "fp32"
         self.precision = torch.float16 if (precision == "fp16") else torch.bfloat16
+
+        # define GradScaler to scale gradients, avoid gradients "underflow"
         # self.scaler = torch.GradScaler("cuda", enabled=self.enable_mixed_precision)
         self.scaler = torch.cuda.amp.GradScaler("cuda", enabled=self.enable_mixed_precision)
 
@@ -104,18 +106,28 @@ class Trainer:
             if epoch % self.eval_interval == 0:
                 metrics, used_time = self.evaluator(self.model, f"epoch {epoch}")
                 self.training_stats["eval_time"].update(used_time)
+
+                # save BEST model checkpoint after self.eval_interval, default 5, within an epoch
                 self.save_best_checkpoint(metrics, epoch)
 
             self.logger.info("============ Starting epoch %i ... ============" % epoch)
-            # set sampler
+            
+            # set sampler so that shuffling works, see https://docs.pytorch.org/docs/stable/data.html
             self.t = time.time()
             self.train_loader.sampler.set_epoch(epoch)
+
+            # train one epoch, separate function. see below
             self.train_one_epoch(epoch)
+
+            # save model checkpoint after self.ckpt_interval, default 20
             if epoch % self.ckpt_interval == 0 and epoch != self.start_epoch:
                 self.save_model(epoch)
 
+        # log and save metrics (for regression MSE & RMSE)
         metrics, used_time = self.evaluator(self.model, "final model")
         self.training_stats["eval_time"].update(used_time)
+
+        # save BEST model checkpoint after self.eval_interval, default 5, after finishing training
         self.save_best_checkpoint(metrics, self.n_epochs)
 
         # save last model
@@ -130,45 +142,60 @@ class Trainer:
         self.model.train()
 
         end_time = time.time()
+
+        # for the called epoch iterate through all batches and:
+        #   1) retrieve image and target data
+        #   2) compute logits (here, model = decoder, which contains the encoder)
+        #   3) calculate mse = loss with target and logits (changed from original since sparse mse)
+        #   4) Reset gradients with self.optimizer.zero_grad()
+        #   5) Assert that calculated loss != nan
+        #   6) Scale loss, unscale gradients, call optimizer, update scaler for next iteration, see https://docs.pytorch.org/docs/stable/notes/amp_examples.html#typical-mixed-precision-training
+        #   7) update statistics, log information into logger and WandB, decay lr
+
         for batch_idx, data in enumerate(self.train_loader):
+            #)1
             image, target = data["image"], data["target"]
             image = {modality: value.to(self.device) for modality, value in image.items()}
             target = target.to(self.device)
 
             self.training_stats["data_time"].update(time.time() - end_time)
-
+            # 2) & 3)
             with torch.autocast(
                 "cuda", enabled=self.enable_mixed_precision, dtype=self.precision
             ):
                 logits = self.model(image, output_shape=target.shape[-2:])
                 loss = self.compute_loss(logits, target)
-
+            # 4)
             self.optimizer.zero_grad()
-
+            
+            # 5)
             if not torch.isfinite(loss):
                 raise FloatingPointError(
                     f"Rank {self.rank} got infinite/NaN loss at batch {batch_idx} of epoch {epoch}!"
                 )
-
+            # 6)
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
             self.scaler.update()
+            
+            # 7)
             self.training_stats['loss'].update(loss.item())
             with torch.no_grad():
                 self.compute_logging_metrics(logits, target)
             if (batch_idx + 1) % self.log_interval == 0:
                 self.log(batch_idx + 1, epoch)
 
+            # decay lr
             self.lr_scheduler.step()
 
             if self.use_wandb and self.rank == 0:
                 self.wandb.log(
                     {
-                        "train_loss": loss.item(),
-                        "learning_rate": self.optimizer.param_groups[0]["lr"],
+                        "Train MSE (Loss per epoch, per batch)": loss.item(),
+                        "learning_rate_per_batch": self.optimizer.param_groups[0]["lr"],
                         "epoch": epoch,
                         **{
-                            f"train_{k}": v.avg
+                            f"Train {k} (running average)": v.avg
                             for k, v in self.training_metrics.items()
                         },
                     },
@@ -551,7 +578,15 @@ class RegTrainer(Trainer):
         Returns:
             torch.Tensor: loss value.
         """
-        return self.criterion(logits.squeeze(dim=1), target)
+        # for sparse mse, get central pixel assuming image height = image width and no rescaling
+        pxl = int(logits.shape[-1]/2)
+        
+        assert logits.squeeze(dim=1).shape == target.shape, f"Shape error in evaluator.py: logits.shape (squeezed) = {logits.squeeze(dim=1).shape} != target.shape {target.shape}"
+
+        # original code:
+        #return self.criterion(logits.squeeze(dim=1), target)
+
+        return self.criterion(logits.squeeze(dim=1)[:,pxl,pxl], target[:,pxl,pxl])
 
     @torch.no_grad()
     def compute_logging_metrics(
@@ -563,7 +598,12 @@ class RegTrainer(Trainer):
             logits (torch.Tensor): logits from the decoder.
             target (torch.Tensor): target tensor.
         """
+        # for sparse mse, get central pixel assuming image height = image width and no rescaling
+        pxl = int(logits.shape[-1]/2)
 
-        mse = F.mse_loss(logits.squeeze(dim=1), target)  
+        # original code
+        #mse = F.mse_loss(logits.squeeze(dim=1), target)
+
+        mse = F.mse_loss(logits.squeeze(dim=1)[:,pxl,pxl], target[:,pxl,pxl])
         self.training_metrics["MSE"].update(mse.item())
 
