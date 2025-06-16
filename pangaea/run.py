@@ -66,19 +66,22 @@ def main(cfg: DictConfig) -> None:
     Args:
         cfg (DictConfig): main_config
     """
-    # fix all random seeds
+    # function imported from '/utils/utils.py': fix all random seeds, settings to preserve reproducibility
     fix_seed(cfg.seed)
+
     # distributed training variables
     rank = int(os.environ["RANK"])
     local_rank = int(os.environ["LOCAL_RANK"])
     device = torch.device("cuda", local_rank)
 
+    # set device to cuda, use the NCCL backend for distributed GPU training (source: https://docs.pytorch.org/docs/stable/distributed.html)
     torch.cuda.set_device(device)
     torch.distributed.init_process_group(backend="nccl")
 
     # true if training else false
     train_run = cfg.train
     if train_run:
+        # set up experiment directory, train.log and save configurations
         exp_info = get_exp_info(HydraConfig.get())
         exp_name = exp_info["exp_name"]
         task_name = exp_info["task"]
@@ -119,34 +122,48 @@ def main(cfg: DictConfig) -> None:
                 resume="allow",
             )
 
+    # log information regarding experiment set-up (device, directory)
     logger = init_logger(logger_path, rank=rank)
     logger.info("============ Initialized logger ============")
     logger.info(pprint.pformat(OmegaConf.to_container(cfg), compact=True).strip("{}"))
     logger.info("The experiment is stored in %s\n" % exp_dir)
     logger.info(f"Device used: {device}")
 
+    # instatiate encoder with the configurations passed in the encoder.yaml file; check for missing parameters between model and loaded weights
     encoder: Encoder = instantiate(cfg.encoder)
     encoder.load_encoder_weights(logger)
     logger.info("Built {}.".format(encoder.model_name))
 
-    # prepare the decoder (segmentation/regression)
+    # prepare the decoder dependent from task (segmentation/regression) and allow for distributed data parallelism (See https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html)
     decoder: Decoder = instantiate(
         cfg.decoder,
         encoder=encoder,
+        padding=cfg.padding                     # PADDING ADDED
     )
     decoder.to(device)
+
+    # Option to print model - comment if not needed and change to also include sar, and other features (only S2 bands for now)
+    if cfg.show_model:
+        logger.info(f"====== Encoder architecture: ======")
+        logger.info(encoder)
+        logger.info(f"====== Decoder architecture: ======")
+        logger.info(decoder)
+
     decoder = torch.nn.parallel.DistributedDataParallel(
         decoder,
         device_ids=[local_rank],
         output_device=local_rank,
         find_unused_parameters=cfg.finetune,
     )
+    
+    # log information regarding built encoder and decoder
     logger.info(
         "Built {} for with {} encoder.".format(
             decoder.module.model_name, type(encoder).__name__
         )
     )
 
+    # define modalities supported by the encoder and collate them in a separate function (needed for DataLoader)
     modalities = list(encoder.input_bands.keys())
     collate_fn = get_collate_fn(modalities)
 
@@ -166,7 +183,7 @@ def main(cfg: DictConfig) -> None:
             _recursive_=False,
         )
 
-        # get datasets
+        # get raw train and val datasets
         raw_train_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="train")
         raw_val_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="val")
 
@@ -200,13 +217,15 @@ def main(cfg: DictConfig) -> None:
         )
 
         logger.info("Built {} dataset.".format(cfg.dataset.dataset_name))
+        #print("random image before dataloader:", val_dataset[6713]["image"]["optical"][3,:,:1,:6])
+        #print("shape of random target before dataloader:", val_dataset[1]["target"].shape)
 
         logger.info(
             f"Total number of train patches: {len(train_dataset)}\n"
             f"Total number of validation patches: {len(val_dataset)}\n"
         )
 
-        # get train val data loaders
+        # get train and val data loaders
         train_loader = DataLoader(
             train_dataset,
             sampler=DistributedSampler(train_dataset),
@@ -234,6 +253,7 @@ def main(cfg: DictConfig) -> None:
             collate_fn=collate_fn,
         )
 
+        # get parameters for training
         criterion = instantiate(cfg.criterion)
         optimizer = instantiate(cfg.optimizer, params=decoder.parameters())
         lr_scheduler = instantiate(
@@ -242,6 +262,7 @@ def main(cfg: DictConfig) -> None:
             total_iters=len(train_loader) * cfg.task.trainer.n_epochs,
         )
 
+        # instatiate evaluator with val dataloader and the trainer with train dataloder
         val_evaluator: Evaluator = instantiate(
             cfg.task.evaluator, val_loader=val_loader, exp_dir=exp_dir, device=device
         )
@@ -260,9 +281,12 @@ def main(cfg: DictConfig) -> None:
         if cfg.ckpt_dir is not None:
             trainer.load_model(cfg.ckpt_dir)
 
+        # train model, see trainer.py
         trainer.train()
 
     # Evaluation
+
+    # instatiate pre.processor for evaluation (also called test) dataset
     test_preprocessor = instantiate(
         cfg.preprocessing.test,
         dataset_cfg=cfg.dataset,
@@ -270,7 +294,7 @@ def main(cfg: DictConfig) -> None:
         _recursive_=False,
     )
 
-    # get datasets
+    # get raw test dataset
     raw_test_dataset: RawGeoFMDataset = instantiate(cfg.dataset, split="test")
     test_dataset = GeoFMDataset(raw_test_dataset, test_preprocessor)
     logger.info(
@@ -287,6 +311,7 @@ def main(cfg: DictConfig) -> None:
         drop_last=False,
         collate_fn=collate_fn,
     )
+
     test_evaluator: Evaluator = instantiate(
         cfg.task.evaluator, val_loader=test_loader, exp_dir=exp_dir, device=device
     )

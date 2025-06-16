@@ -1,0 +1,22 @@
+# Needed for resizing
+
+train:
+    _target_: pangaea.engine.data_preprocessor.Preprocessor
+    preprocessor_cfg:
+        - _target_: pangaea.engine.data_preprocessor.PadToEncoder
+        - _target_: pangaea.engine.data_preprocessor.BandFilter
+        - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+
+val:
+    _target_: pangaea.engine.data_preprocessor.Preprocessor
+    preprocessor_cfg:
+        - _target_: pangaea.engine.data_preprocessor.PadToEncoder
+        - _target_: pangaea.engine.data_preprocessor.BandFilter
+        - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+
+test:
+    _target_: pangaea.engine.data_preprocessor.Preprocessor
+    preprocessor_cfg:
+        - _target_: pangaea.engine.data_preprocessor.PadToEncoder
+        - _target_: pangaea.engine.data_preprocessor.BandFilter
+        - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd

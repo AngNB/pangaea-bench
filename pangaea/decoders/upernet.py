@@ -517,6 +517,7 @@ class RegUPerNet(Decoder):
         pool_scales=(1, 2, 3, 6),
         feature_multiplier: int = 1,
         in_channels: list[int] | None = None,
+        padding: bool = False,                  # PADDING ADDED
     ):
         super().__init__(
             encoder=encoder,
@@ -525,6 +526,7 @@ class RegUPerNet(Decoder):
         )
 
         self.model_name = "Reg_UPerNet"
+        self.padding=padding                    # PADDING ADDED
         if not self.finetune:
             for param in self.encoder.parameters():
                 param.requires_grad = False
@@ -676,7 +678,13 @@ class RegUPerNet(Decoder):
 
         if output_shape is None:
             output_shape = img[list(img.keys())[0]].shape[-2:]
-        output = F.interpolate(output, size=output_shape, mode="bilinear")
+
+        # changed from original to allow padding and cropping strategy with AGBD,py (no interpolation, just padd right and bottom when preprocessing and then just crop the logits, here output, to match output_shape)
+        if self.padding:
+            crop_size = output_shape[0]
+            output = output[:,:,:crop_size,:crop_size]
+        else:
+            output = F.interpolate(output, size=output_shape, mode="bilinear")
 
         return output
 

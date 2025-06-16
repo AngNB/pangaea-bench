@@ -180,7 +180,7 @@ class GeoFMDataset(Dataset):
             {"image":
                 {
                 "optical": torch.Tensor of shape (C T H W) (where T=1 if single-temporal dataset),
-                 "sar": torch.Tensor of shape (C T H W) (where T=1 if single-temporal dataset),
+                "sar": torch.Tensor of shape (C T H W) (where T=1 if single-temporal dataset),
                  },
             "target": torch.Tensor of shape (H W) of type torch.int64 for segmentation, torch.float for
             regression datasets.,
@@ -189,6 +189,7 @@ class GeoFMDataset(Dataset):
 
         # dataset class is called and get_item function is called
         output = self.raw_dataset[i // self.replicate]
+        
         # pre-process the item, only after pre-processor has been instatiated, data_preprocessor.py is called
         if self.preprocessor is not None:
             output = self.preprocessor(output)
