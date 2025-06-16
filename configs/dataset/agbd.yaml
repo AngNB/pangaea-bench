@@ -1,31 +1,43 @@
+# added parameters needed according to dataset.py, source: https://github.com/ghjuliasialelli/AGBD/tree/d8e7287bbe787277d64f25806f3c991b9cec7076
+
 _target_: pangaea.datasets.agbd.AGBD
 dataset_name: AGBD
-root_path: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
-hdf5_dir: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
-hdf5_pattern: data_subset-*-v4_*-20.h5
-split_files: /cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd
-label_group: GEDI
-label_name: agbd
+
+# Define the paths and download information
+root_path: ./data/agbd                    #/cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd # main path
+hdf5_dir: ./data/agbd                     #/cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd # path to the h5 files
+mapping_path: ./data/agbd                 #/cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd # path to file mapping each mode to its tiles (biomes_splits_to_name.pkl)
+norm_path: ./data/agbd                    #/cluster/work/igp_psr/gsialelli/Data/patches/ # ./data/agbd # path to files with normalization values (statistics_subset_2019-2020-v{version}_new.pkl)
+
+version: 4                                # current version of patches is 4
+download_url:                             # needs manuel download from https://libdrive.ethz.ch/index.php/s/VPio6i5UlXTgir0, following code from download.sh, see source above
+auto_download: False
+
+# Define the parameters
+split: None                               # is overwritten when run.py
+chunk_size: 1                             # AGBD is patch-based, so chunk_size=1, same as in original script, see source above
+years: [2019, 2020]                       # for file extraction
 
 img_size: 25
-multi_temporal: false
-multi_modal: true # Verify TODO
+multi_temporal: False                     # AGBD is not multi_temporal
+multi_modal: True                         # AGBD has S2 bands, SAR bands and auxiliary bands
+debug: False                              # When true, only a part of the data is loaded, reduces computation time
+
 
 # Regression task configuration
-ignore_index: -1
-num_classes: 1
+ignore_index: -1                          # Parameter needed for PANGAEA, used when cropping, here default -1
+num_classes: 1                            # AGBD is regression dataset, so set num_classes to 1
 classes:
-  - regression
-distribution:
+  - regression                            # AGBD is regression dataset, so classes set to 'regression'
+distribution:                             # only one class => one distribution
   - 1.0
 
 # Band configuration - all available modalities 
 bands:
-  optical: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12] #TODO SOME need different names, should work now though
-  sar: [VV, VH] # Renamed for cerain models, should still work? otherwise rename 
-  auxiliary: [DEM, CH_ch, CH_std, LC_1, LC_2, S2_SCL] 
+  optical: [B1, B2, B3, B4, B5, B6, B7, B8, B8A, B9, B11, B12]
+  sar: [HH, HV] 
 
-# Normalization statistics from diagnostic logs 
+# Normalization statistics from diagnostic logs (look up in statistics files, see download.sh in source above)
 data_mean:
   optical: [0.12478869, 0.13480005, 0.16031432, 0.1532097, 0.20312776, 0.32636437, 0.36605212, 0.3811653, 0.3910436, 0.3910644, 0.2917373, 0.21169408]
   sar: [-10.381429, -16.722847]
