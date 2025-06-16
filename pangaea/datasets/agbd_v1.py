@@ -141,7 +141,7 @@ def encode_lc(lc_data):
     return lc_cos, lc_sin, lc_prob
 # --- End copied helper functions ---
 
-class AGBD(Dataset):
+class AGBD(RawGeoFMDataset):
     """
     PANGAEA-compatible dataset for AGBD, adapted from GEDIDataset.
     Uses only biomes_splits_to_name.pkl for split logic, matching the original AGBD code.
@@ -310,5 +310,5 @@ class AGBD(Dataset):
         except Exception:
             pass
         # --- END PATCH COORDINATE/INDEX METADATA ---
-        
+
         return {'image': image, 'target': agbd, 'metadata': metadata}
