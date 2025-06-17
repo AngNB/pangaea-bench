@@ -3,26 +3,25 @@
 train:
     _target_: pangaea.engine.data_preprocessor.Preprocessor
     preprocessor_cfg:
-        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
         - _target_: pangaea.engine.data_preprocessor.BandFilter
         - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
         - _target_: pangaea.engine.data_preprocessor.HorizontalFlip
 
 
 val:
     _target_: pangaea.engine.data_preprocessor.Preprocessor
     preprocessor_cfg:
-        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
         - _target_: pangaea.engine.data_preprocessor.BandFilter
         - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
         - _target_: pangaea.engine.data_preprocessor.HorizontalFlip
 
 
 test:
     _target_: pangaea.engine.data_preprocessor.Preprocessor
     preprocessor_cfg:
-        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
         - _target_: pangaea.engine.data_preprocessor.BandFilter
         - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
-        - _target_: pangaea.engine.data_preprocessor.HorizontalFlip
+        - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
 
