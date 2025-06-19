@@ -1,5 +1,5 @@
 train: true
-work_dir: ""
+work_dir: "" #"/cluster/scratch/user/" -> ADAPT IF RUNNING ON CLUSTER WITH LIMITED HOME DISK SPACE
 seed: 234
 use_wandb: false
 wandb_run_id: null
@@ -21,7 +21,6 @@ stratification_bins: 3 #  number of bins for stratified sampling, only for strat
 data_replicate: 1
 use_final_ckpt: false
 show_model: False
-padding: False
 
 defaults:
   - task: ???
