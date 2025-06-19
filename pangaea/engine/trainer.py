@@ -187,15 +187,14 @@ class Trainer:
 
             # decay lr
             self.lr_scheduler.step()
-
             if self.use_wandb and self.rank == 0:
                 self.wandb.log(
                     {
-                        "Train MSE (Loss per epoch, per batch)": loss.item(),
+                        "Train_MSE_(Loss_per_epoch_per_batch)": loss.item(),
                         "learning_rate_per_batch": self.optimizer.param_groups[0]["lr"],
                         "epoch": epoch,
                         **{
-                            f"Train {k} (running average)": v.avg
+                            f"Train_{k}_(running_average)": v.avg
                             for k, v in self.training_metrics.items()
                         },
                     },

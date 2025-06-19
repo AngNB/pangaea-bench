@@ -680,10 +680,9 @@ class Resize(BasePreprocessor):
     def __init__(
         self,
         size: int | Sequence[int],
-        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL, WAS BILINEAR
+        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL TO FIT SATMAE FINETUNING, WAS BILINEAR
         antialias: Optional[bool] = True,
         resize_target: bool = True,
-        padding: bool = False,                      # PADDING ADDED
         **meta,
     ) -> None:
         """Initialize the Resize preprocessor.
@@ -712,7 +711,6 @@ class Resize(BasePreprocessor):
         self.interpolation = interpolation
         self.antialias = antialias
         self.resize_target = resize_target
-        self.padding=padding                        # PADDING ADDED
 
     def __call__(
         self, data: dict[str, torch.Tensor | dict[str, torch.Tensor]]
@@ -731,26 +729,13 @@ class Resize(BasePreprocessor):
             "target": torch.Tensor of shape (H W),
              "metadata": dict}.
         """
-        # differentiate if padding or resizing with interpolation; key word is "self.padding" which is overwritten by PadToEncoder() in case of padding, default: False
-        if self.padding:
-            for k, v in data["image"].items():
-                original_data = data["image"][k]
-
-                original_size = list(original_data.shape)
-                new_size = original_size[:2] + list(self.size)
-                crop_size = original_size[-1]
-                # create tensor with right shape with zeros and overwrite all top left values with original data
-                data["image"][k] = torch.zeros(new_size, dtype=original_data.dtype, device = original_data.device)
-                data["image"][k][:,:,:crop_size,:crop_size] = original_data
-                
-        else:
-            for k, v in data["image"].items():
-                data["image"][k] = TF.resize(
-                    data["image"][k],
-                    self.size,
-                    interpolation=self.interpolation,
-                    antialias=self.antialias,
-                )
+        for k, v in data["image"].items():
+            data["image"][k] = TF.resize(
+                data["image"][k],
+                self.size,
+                interpolation=self.interpolation,
+                antialias=self.antialias,
+            )
 
         if self.resize_target:
             if torch.is_floating_point(data["target"]):
@@ -777,10 +762,9 @@ class Resize(BasePreprocessor):
 class ResizeToEncoder(Resize):
     def __init__(
         self,
-        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL, WAS BILINEAR
+        interpolation=T.InterpolationMode.BICUBIC,                      ### CHANGED FROM ORIGINAL TO FIT SATMAE FINETUNING, WAS BILINEAR
         antialias: Optional[bool] = True,
         resize_target: bool = False,
-        padding: bool = False,
         **meta,
     ) -> None:
         """Initialize the ResizeToEncoder preprocessor.
@@ -792,30 +776,7 @@ class ResizeToEncoder(Resize):
         meta: statistics/info of the input data and target encoder
         """
         size = meta["encoder_input_size"]
-
-        super().__init__(size, interpolation, antialias, resize_target, padding=padding, **meta)   # PADDING ADDED
-
-# added a new class, allowing the padding of the image on right side and at the bottom to fit encoder input size
-class PadToEncoder(Resize):
-    def __init__(
-        self,
-        interpolation=T.InterpolationMode.BICUBIC,
-        antialias: Optional[bool] = True,
-        resize_target: bool = False,
-        padding: bool = True,
-        **meta,
-    ) -> None:
-        """Initialize the PadToEncoder preprocessor.
-        Args:
-        interpolation (InterpolationMode): Desired interpolation enum defined by
-            :class:`torchvision.transforms.InterpolationMode`.
-        antialias (bool, optional): Whether to apply antialiasing.
-        resize_target (bool, optional): Whether to resize the target
-        meta: statistics/info of the input data and target encoder
-        """
-        size = meta["encoder_input_size"]
-
-        super().__init__(size, interpolation, antialias, resize_target, padding=padding, **meta)
+        super().__init__(size, interpolation, antialias, resize_target, **meta)
 
 class HorizontalFlip(BasePreprocessor):
     def __init__(

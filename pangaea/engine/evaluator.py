@@ -3,15 +3,20 @@ import os
 import time
 from pathlib import Path
 import math
+import numpy as np
+import sklearn.metrics
 import wandb
 
 import torch
 import torch.nn.functional as F
+from torch import Tensor
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 # added for visualization when regression
 import random
+import csv
+
 
 
 class Evaluator:
@@ -215,6 +220,7 @@ class SegEvaluator(Evaluator):
             
             
             # ------------------------------ VISUALIZATION ------------------------------
+            '''
             # SAVE SOME INTERMEDIATE RESULTS (ONLY PREDS THAT HAVE VALID VALUES ONLY AND IF WANDB IS ACTIVATED)
             if torch.all(torch.flatten(valid_mask)) and self.use_wandb and self.rank == 0:
                 # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
@@ -244,7 +250,7 @@ class SegEvaluator(Evaluator):
                     else:   
                         wandb.log({f"batch_{batch_idx}_{model_name}_pred": img_pred})
                         wandb.log({f"batch_{batch_idx}_{model_name}_target": img_target})
-
+            '''
             # ------------------------------ VISUALIZATION ------------------------------
 
 
@@ -390,8 +396,9 @@ class RegEvaluator(Evaluator):
         super().__init__(val_loader, exp_dir, device, inference_mode, sliding_inference_batch, use_wandb)
 
     @torch.no_grad()
-    def evaluate(self, model, model_name='model', model_ckpt_path=None):
+    def evaluate(self, model, model_name='model', model_ckpt_path=None, testing_bool=False):
         t = time.time()
+        self.testing_bool=testing_bool
 
         if model_ckpt_path is not None:
             model_dict = torch.load(model_ckpt_path, map_location=self.device, weights_only=False)  # added 'weights_only=False'
@@ -408,6 +415,9 @@ class RegEvaluator(Evaluator):
         tag = f'Evaluating {model_name} on {self.split} set'
 
         mse = torch.zeros(1, device=self.device)
+        mean_absolute_error = torch.zeros(1, device=self.device)
+        mean_error = torch.zeros(1, device=self.device)
+
 
         for batch_idx, data in enumerate(tqdm(self.val_loader, desc=tag)):
             image, target = data['image'], data['target']
@@ -429,7 +439,23 @@ class RegEvaluator(Evaluator):
             assert logits.shape == target.shape, f"Shape error in evaluator.py: logits.shape = {logits.shape} != target.shape {target.shape}"
 
             mse += F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
+
+            # calculate extra metrics for logging
             mse_to_print = F.mse_loss(logits[:,pxl,pxl],target[:,pxl,pxl])
+
+            error_per_batch = (logits[:,pxl,pxl] - target[:,pxl,pxl])
+            mean_error += torch.mean(error_per_batch)
+
+            absolute_error = (torch.abs(error_per_batch))
+            mean_absolute_error += torch.mean(absolute_error)
+
+            if self.testing_bool:
+                path_to_csv = os.path.join(self.exp_dir, f"test_metrics/metrics.csv")
+                with open(path_to_csv, 'a') as file:
+                    writer = csv.writer(file)
+                    for i in range(target.shape[0]):
+                        writer.writerow([batch_idx, i, target[i,pxl,pxl].item(), logits[i,pxl,pxl].item(), mse_to_print.item()])
+                    file.close()
 
             # ------------------------------ VISUALIZATION ------------------------------
             # save predicted values in testing phase, when best model with name "chechpoint__best" is called to evaluate on the test dataset (only when use_wandb=true)
@@ -440,7 +466,7 @@ class RegEvaluator(Evaluator):
 
                     # create index for random image in the batch
                     max_batch_size = logits.shape[0]
-                    i = random.randint(0, max_batch_size)
+                    i = random.randint(0, max_batch_size-1)
 
                     # ONLY SHOW CENTRAL PIXEL -> MASK THE REST
                     logits_pxl = pred_saved[i,pxl,pxl]
@@ -475,9 +501,13 @@ class RegEvaluator(Evaluator):
 
         torch.distributed.all_reduce(mse, op=torch.distributed.ReduceOp.SUM)
         mse = mse / len(self.val_loader)
+        mean_absolute_error = mean_absolute_error/ len(self.val_loader)
+        mean_error = mean_error / len(self.val_loader)
+
+        other_metrics = {"MAE": mean_absolute_error.item(), "ME": mean_error.item()}
 
         metrics = {"MSE": mse.item(), "RMSE": torch.sqrt(mse).item()}
-        self.log_metrics(metrics)
+        self.log_metrics(metrics, other_metrics)
 
         used_time = time.time() - t
 
@@ -487,11 +517,11 @@ class RegEvaluator(Evaluator):
     def __call__(self, model, model_name='model', model_ckpt_path=None):
         return self.evaluate(model, model_name, model_ckpt_path)
 
-    def log_metrics(self, metrics):
+    def log_metrics(self, metrics, other_metrics):
         header = "------- MSE and RMSE --------\n"
         mse = "-------------------\n" + 'MSE \t{:>7}'.format('%.3f' % metrics['MSE']) + '\n'
         rmse = "-------------------\n" + 'RMSE \t{:>7}'.format('%.3f' % metrics['RMSE'])
         self.logger.info(header + mse + rmse)
 
         if self.use_wandb and self.rank == 0:
-            wandb.log({f"{self.split}_MSE (mean over test batches)": metrics["MSE"], f"{self.split}_RMSE (mean over test batches)": metrics["RMSE"]})
+            wandb.log({f"{self.split}_MSE_(mean_over_test_batches)": metrics["MSE"], f"{self.split}_RMSE_(mean_over_test_batches)": metrics["RMSE"], f"{self.split}_MAE_(mean_over_test_batches)": other_metrics["MAE"], f"{self.split}_ME_(mean_over_test_batches)": other_metrics["ME"]})
