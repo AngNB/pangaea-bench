@@ -27,3 +27,13 @@ def MultiStepLR(
         optimizer, [int(total_iters * r) for r in lr_milestones], gamma=0.1
     )
 
+''' manually hardcoded based on experiment settings'''
+'''PANGAEA default
+    return torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, [int(total_iters * r) for r in lr_milestones], gamma=0.1
+    )'''
+
+''' used for training - except for one
+    return torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, [30000000], gamma=0.1
+    )'''
