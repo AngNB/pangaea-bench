@@ -3,6 +3,8 @@ import os as os
 import pathlib
 import pprint
 import time
+import csv
+
 
 import hydra
 import torch
@@ -90,6 +92,18 @@ def main(cfg: DictConfig) -> None:
         logger_path = exp_dir / "train.log"
         config_log_dir = exp_dir / "configs"
         config_log_dir.mkdir(exist_ok=True)
+        
+        #create dir and empty csv file to retrieve information during testing
+        test_metrics_dir = exp_dir / "test_metrics"
+        test_metrics_dir.mkdir(exist_ok=True)
+        path_to_csv = os.path.join(exp_dir, f"test_metrics/metrics.csv")
+        with open(path_to_csv, 'w') as f:
+            writer = csv.writer(f)
+            field = ["batch_id","image_id","target", "prediction", "MSE_per_batch"]
+            writer.writerow(field)
+            f.close()
+            
+        
         # init wandb
         if cfg.task.trainer.use_wandb and rank == 0:
             import wandb
@@ -138,11 +152,10 @@ def main(cfg: DictConfig) -> None:
     decoder: Decoder = instantiate(
         cfg.decoder,
         encoder=encoder,
-        padding=cfg.padding                     # PADDING ADDED
     )
     decoder.to(device)
 
-    # Option to print model - comment if not needed and change to also include sar, and other features (only S2 bands for now)
+    # Option to print model, configurable in command line
     if cfg.show_model:
         logger.info(f"====== Encoder architecture: ======")
         logger.info(encoder)
@@ -320,7 +333,8 @@ def main(cfg: DictConfig) -> None:
         model_ckpt_path = get_final_model_ckpt_path(exp_dir)
     else:
         model_ckpt_path = get_best_model_ckpt_path(exp_dir)
-    test_evaluator.evaluate(decoder, "test_model", model_ckpt_path)
+
+    test_evaluator.evaluate(decoder, "test_model", model_ckpt_path, testing_bool=True)
 
     if cfg.use_wandb and rank == 0:
         wandb.finish()
