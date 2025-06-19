@@ -2,7 +2,7 @@ from functools import partial
 from logging import Logger
 from pathlib import Path
 
-
+import numpy
 ### COPY PASTED FROM GITHUB REPO FROM SATMAE - REMOVED/COMMENTED PARTS RELATED TO DECODER SINCE ONLY ENCODER NEEDED; DECODER TAILORED TO TASK
 ### ESSENTIALLY 2 CLASSES: ONE IS CALLED AS SATMAE => ""
 
@@ -20,8 +20,8 @@ import torch.nn as nn
 
 from timm.models.vision_transformer import PatchEmbed, Block
 
-from pangaea.encoders.pos_embed import get_2d_sincos_pos_embed, get_1d_sincos_pos_embed_from_grid # CHANGE SOURCE
-from pangaea.encoders.base import Encoder # ADDED SINCE INHERITING FROM ENCODER
+from pangaea.encoders.pos_embed import get_2d_sincos_pos_embed, get_1d_sincos_pos_embed_from_grid
+from pangaea.encoders.base import Encoder # added, inheriting from Encoder() class
 
 
 class MaskedAutoencoderGroupChannelViT(nn.Module):
@@ -40,7 +40,6 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         self.spatial_mask = spatial_mask  # Whether to mask all channels of same spatial location
         num_groups = len(channel_groups)
         
-        # ADDED AS PART OF THE INTEGRATION INTO PANGAEA
         self.embed_dim = embed_dim
         self.depth = depth
         self.num_heads = num_heads
@@ -52,21 +51,24 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
 
         # --------------------------------------------------------------------------
         # MAE encoder specifics
-        self.patch_embed = nn.ModuleList([PatchEmbed(img_size, patch_size, len(group), embed_dim)
-                                          for group in channel_groups])
-        # self.patch_embed = PatchEmbed(img_size, patch_size, 1, embed_dim)
-        num_patches = self.patch_embed[0].num_patches
 
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
+        # embed the patches of the image and group channels
+        self.patch_embed = nn.ModuleList([PatchEmbed(img_size, patch_size, len(group), embed_dim)
+                                          for group in channel_groups])  #buils 3 PatchEmbed() objects (1x Conv2D, 1x Identity()), with two objects having in_channels=4 and and one with in_channels=2
+        # self.patch_embed = PatchEmbed(img_size, patch_size, 1, embed_dim)
+        num_patches = self.patch_embed[0].num_patches # should be 144 with SatMAE Base settings
+
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, embed_dim)) # Shape: [1, 1, 768] full of zeros
+        
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches + 1, embed_dim - channel_embed),
-                                      requires_grad=False)  # fixed sin-cos embedding
-        self.channel_embed = nn.Parameter(torch.zeros(1, num_groups, channel_embed), requires_grad=False)
+                                      requires_grad=False)  # fixed sin-cos embedding, #Shape: [1, 145, 512]
+
+        self.channel_embed = nn.Parameter(torch.zeros(1, num_groups, channel_embed), requires_grad=False) # Shape: [1, 3, 256]
         # self.enc_mask_token = nn.Parameter(torch.zeros(1, 1, embed_dim))
 
         self.blocks = nn.ModuleList([
             Block(embed_dim, num_heads, mlp_ratio, qkv_bias=True, norm_layer=norm_layer)
             for i in range(depth)])
-
         ### REMOVED A VARIABLE "qk_scale=None" THAT SEEMED TO NOT EXIST ANYMORE; SEE ALSO https://github.com/facebookresearch/mae/issues/58
 
         self.norm = norm_layer(embed_dim)
@@ -97,9 +99,9 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
                                            for group in channel_groups])
         # self.decoder_pred = nn.Linear(decoder_embed_dim, patch_size ** 2, bias=True)  # decoder to patch
         # --------------------------------------------------------------------------
+        '''
 
-        self.norm_pix_loss = norm_pix_loss
-        '''        
+        # self.norm_pix_loss = norm_pix_loss   # normalizes target in forward_loss, it is not called here though since called in forward(), which callfs forward_encoder() and forward_decoder()
 
         self.initialize_weights()
 
@@ -130,7 +132,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
             torch.nn.init.xavier_uniform_(w.view([w.shape[0], -1]))
 
         # timm's trunc_normal_(std=.02) is effectively normal_(std=0.02) as cutoff is too big (2.)
-        torch.nn.init.normal_(self.cls_token, std=.02)
+        torch.nn.init.normal_(self.cls_token, std=.02) # Fill the input Tensor with values drawn from the normal distribution, see https://docs.pytorch.org/docs/stable/nn.init.html
         
         ''' RELATED TO DECODER - REMOVED
         torch.nn.init.normal_(self.mask_token, std=.02)
@@ -149,7 +151,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
 
-    def patchify(self, imgs, p, c):
+    '''def patchify(self, imgs, p, c):
         """
         imgs: (N, C, H, W)
         p: Patch embed patch size
@@ -181,7 +183,7 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         x = x.reshape(shape=(x.shape[0], h, w, c, p, p))
         x = torch.einsum('nhwcpq->nchpwq', x)
         imgs = x.reshape(shape=(x.shape[0], c, h * p, h * p))
-        return imgs
+        return imgs'''
 
     def random_masking(self, x, mask_ratio):
         """
@@ -211,15 +213,15 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         return x_masked, mask, ids_restore
 
     def forward_encoder(self, x, mask_ratio):
-        # x is (N, C, H, W)
+        # x is (N, C, H, W), N = batch, C = channels (according to paper https://arxiv.org/pdf/2207.08051)
         b, c, h, w = x.shape
 
         x_c_embed = []
         for i, group in enumerate(self.channel_groups):
             x_c = x[:, group, :, :]
-            x_c_embed.append(self.patch_embed[i](x_c))  # (N, L, D)
+            x_c_embed.append(self.patch_embed[i](x_c))  # (N, L, D) => L = Number of patches = (H/P) * (W/P), D = embed_dim (according to paper https://arxiv.org/pdf/2207.08051)
 
-        x = torch.stack(x_c_embed, dim=1)  # (N, G, L, D)
+        x = torch.stack(x_c_embed, dim=1)  # (N, G, L, D) => G = Number of groups
         _, G, L, D = x.shape
 
         # add channel embed
@@ -247,9 +249,9 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
             mask = mask.view(b, G, L)
 
         # append cls token
-        cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
+        cls_tokens = self.cls_token.expand(x.shape[0], -1, -1) # Shape: [64, 1, 768]
         x = torch.cat((cls_tokens, x), dim=1)  # (N, G*L + 1, D)
-        
+
         ''' ORIGINAL CODE - NEEDS CHANGES SO AS TO EXTRACT INTERMEDIATE LAYER RESULTS WHEN FORWARD; NOT ONLY THE LAST RESULTING LAYER; REMOVED THIS AND ADDED THIS PART (1)
         # apply Transformer blocks
         
@@ -260,13 +262,14 @@ class MaskedAutoencoderGroupChannelViT(nn.Module):
         return x, mask, ids_restore
         '''
 
-        # (1) ADDED THIS PART, SEE COMMENT ABOVE; RETURN ONLY THE NEEDED LAYERS
+        # (1) ADDED THIS PART, SEE COMMENT ABOVE; RETURN ONLY THE NEEDED LAYERS and apply layer normalization
 
         output = []
 
         for i, blk in enumerate(self.blocks):
             x = blk(x)
             if i in self.output_layers:
+                x = self.norm(x)            # originally normalize after loop since applied only last layer, but here we need to normalize in each loop due to extraction of output layers
                 out = (
                     x[:, 1:]
                     .permute(0, 2, 1)
