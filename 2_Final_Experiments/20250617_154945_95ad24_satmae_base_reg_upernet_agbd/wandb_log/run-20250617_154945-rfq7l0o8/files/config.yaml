@@ -1,0 +1,292 @@
+_wandb:
+    value:
+        cli_version: 0.19.11
+        m: []
+        python_version: 3.12.8
+        t:
+            "1":
+                - 1
+                - 5
+                - 41
+                - 50
+                - 53
+                - 55
+            "2":
+                - 1
+                - 5
+                - 41
+                - 49
+                - 50
+                - 53
+                - 55
+                - 63
+            "3":
+                - 2
+                - 13
+                - 16
+                - 23
+                - 55
+                - 61
+            "4": 3.12.8
+            "5": 0.19.11
+            "8":
+                - 5
+            "12": 0.19.11
+            "13": linux-x86_64
+batch_size:
+    value: 128
+ckpt_dir:
+    value: null
+criterion:
+    value:
+        _target_: torch.nn.MSELoss
+data_replicate:
+    value: 1
+dataset:
+    value:
+        _target_: pangaea.datasets.agbd.AGBD
+        auto_download: false
+        bands:
+            optical:
+                - B1
+                - B2
+                - B3
+                - B4
+                - B5
+                - B6
+                - B7
+                - B8
+                - B8A
+                - B9
+                - B11
+                - B12
+            sar:
+                - HH
+                - HV
+        chunk_size: 1
+        classes:
+            - regression
+        data_max:
+            optical:
+                - 1.8808
+                - 2.1776
+                - 2.12
+                - 2.0032
+                - 1.7502
+                - 1.7245
+                - 1.7149
+                - 1.7488
+                - 1.688
+                - 1.7915
+                - 1.648
+                - 1.6775
+            sar:
+                - 13.329468
+                - 11.688309
+        data_mean:
+            optical:
+                - 0.12478869
+                - 0.13480005
+                - 0.16031432
+                - 0.1532097
+                - 0.20312776
+                - 0.32636437
+                - 0.36605212
+                - 0.3811653
+                - 0.3910436
+                - 0.3910644
+                - 0.2917373
+                - 0.21169408
+            sar:
+                - -10.381429
+                - -16.722847
+        data_min:
+            optical:
+                - 0.0001
+                - 0.0001
+                - 0.0001
+                - 0.0001
+                - 0.0422
+                - 0.0502
+                - 0.0616
+                - 0.0001
+                - 0.055
+                - 0.0012
+                - 0.0953
+                - 0.0975
+            sar:
+                - -83
+                - -83
+        data_std:
+            optical:
+                - 0.024433358
+                - 0.02822557
+                - 0.032037303
+                - 0.038628064
+                - 0.04205057
+                - 0.07139242
+                - 0.08555025
+                - 0.092815965
+                - 0.0896364
+                - 0.0836445
+                - 0.07472579
+                - 0.05880649
+            sar:
+                - 8.561741
+                - 8.718428
+        dataset_name: AGBD
+        debug: false
+        distribution:
+            - 1
+        download_url: null
+        hdf5_dir: /scratch/tmp.34653816.anogueira/agbd_data
+        ignore_index: -1
+        img_size: 25
+        mapping_path: /scratch/tmp.34653816.anogueira/agbd_splits
+        multi_modal: true
+        multi_temporal: false
+        norm_path: /scratch/tmp.34653816.anogueira/agbd_data
+        num_classes: 1
+        root_path: /scratch/tmp.34653816.anogueira/agbd_data
+        split: None
+        version: 4
+        years:
+            - 2019
+            - 2020
+decoder:
+    value:
+        _target_: pangaea.decoders.upernet.RegUPerNet
+        channels: 512
+        encoder: null
+        finetune: false
+encoder:
+    value:
+        _target_: pangaea.encoders.satmae_base_encoder.SatMAE_Base
+        channel_embed: 256
+        depth: 12
+        download_url: https://zenodo.org/records/7338613/files/pretrain-vit-base-e199.pth?download=1
+        embed_dim: 768
+        encoder_weights: ./pretrained_models/satmae_pretrain-vit-base-e199.pth
+        in_chans: 3
+        input_bands:
+            optical:
+                - B2
+                - B3
+                - B4
+                - B5
+                - B6
+                - B7
+                - B8
+                - B8A
+                - B11
+                - B12
+        input_size: 96
+        mask_ratio: 0
+        mlp_ratio: 4
+        model_name: SatMAE_Base
+        num_heads: 12
+        output_dim: 2304
+        output_layers:
+            - 3
+            - 5
+            - 7
+            - 11
+        patch_size: 8
+        pyramid_output: false
+        qkv_bias: true
+finetune:
+    value: false
+limited_label_strategy:
+    value: stratified
+limited_label_train:
+    value: 1
+limited_label_val:
+    value: 1
+lr_scheduler:
+    value:
+        _target_: pangaea.utils.schedulers.MultiStepLR
+        lr_milestones:
+            - 0.6
+            - 0.9
+        optimizer: null
+        total_iters: null
+num_workers:
+    value: 16
+optimizer:
+    value:
+        _target_: torch.optim.AdamW
+        betas:
+            - 0.9
+            - 0.95
+        lr: 5e-05
+        params: null
+        weight_decay: 0.05
+preprocessing:
+    value:
+        test:
+            _target_: pangaea.engine.data_preprocessor.Preprocessor
+            preprocessor_cfg:
+                - _target_: pangaea.engine.data_preprocessor.BandFilter
+                - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+                - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
+        train:
+            _target_: pangaea.engine.data_preprocessor.Preprocessor
+            preprocessor_cfg:
+                - _target_: pangaea.engine.data_preprocessor.BandFilter
+                - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+                - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
+                - _target_: pangaea.engine.data_preprocessor.HorizontalFlip
+        val:
+            _target_: pangaea.engine.data_preprocessor.Preprocessor
+            preprocessor_cfg:
+                - _target_: pangaea.engine.data_preprocessor.BandFilter
+                - _target_: pangaea.engine.data_preprocessor.NormalizeMeanStd
+                - _target_: pangaea.engine.data_preprocessor.ResizeToEncoder
+                - _target_: pangaea.engine.data_preprocessor.HorizontalFlip
+seed:
+    value: 234
+show_model:
+    value: false
+stratification_bins:
+    value: 3
+task:
+    value:
+        evaluator:
+            _target_: pangaea.engine.evaluator.RegEvaluator
+            device: null
+            exp_dir: null
+            inference_mode: whole
+            sliding_inference_batch: 8
+            use_wandb: true
+            val_loader: null
+        trainer:
+            _target_: pangaea.engine.trainer.RegTrainer
+            best_metric_key: MSE
+            ckpt_interval: 1
+            criterion: null
+            device: null
+            eval_interval: 1
+            evaluator: null
+            exp_dir: null
+            log_interval: 5
+            lr_scheduler: null
+            model: null
+            n_epochs: 10
+            optimizer: null
+            precision: fp32
+            train_loader: null
+            use_wandb: true
+test_batch_size:
+    value: 128
+test_num_workers:
+    value: 16
+train:
+    value: true
+use_final_ckpt:
+    value: false
+use_wandb:
+    value: true
+wandb_run_id:
+    value: null
+work_dir:
+    value: /cluster/scratch/anogueira/

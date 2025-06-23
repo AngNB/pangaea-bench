@@ -1,0 +1,46 @@
+{"time":"2025-06-17T15:49:45.707554459+02:00","level":"INFO","msg":"stream: starting","core version":"0.19.11","symlink path":"/cluster/home/anogueira/pangaea-bench/wandb/run-20250617_154945-rfq7l0o8/logs/debug-core.log"}
+{"time":"2025-06-17T15:49:46.076915912+02:00","level":"INFO","msg":"created new stream","id":"rfq7l0o8"}
+{"time":"2025-06-17T15:49:46.076991332+02:00","level":"INFO","msg":"stream: started","id":"rfq7l0o8"}
+{"time":"2025-06-17T15:49:46.077008732+02:00","level":"INFO","msg":"handler: started","stream_id":"rfq7l0o8"}
+{"time":"2025-06-17T15:49:46.077056732+02:00","level":"INFO","msg":"sender: started","stream_id":"rfq7l0o8"}
+{"time":"2025-06-17T15:49:46.077093352+02:00","level":"INFO","msg":"writer: Do: started","stream_id":"rfq7l0o8"}
+{"time":"2025-06-17T15:49:46.396555647+02:00","level":"INFO","msg":"Starting system monitor"}
+{"time":"2025-06-17T16:18:34.602446439+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":0,"current":23}
+{"time":"2025-06-17T16:18:36.240545394+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":1,"current":23}
+{"time":"2025-06-17T16:18:37.51247254+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":2,"current":23}
+{"time":"2025-06-17T16:18:38.779821812+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":3,"current":23}
+{"time":"2025-06-17T16:18:40.052350471+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":4,"current":23}
+{"time":"2025-06-17T16:18:41.326984445+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":5,"current":23}
+{"time":"2025-06-17T16:18:42.591992716+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":6,"current":23}
+{"time":"2025-06-17T16:18:43.864298782+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":7,"current":23}
+{"time":"2025-06-17T16:18:45.130552764+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":8,"current":23}
+{"time":"2025-06-17T16:18:46.407145033+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":9,"current":23}
+{"time":"2025-06-17T16:18:47.675746187+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":10,"current":23}
+{"time":"2025-06-17T16:18:48.950834547+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":11,"current":23}
+{"time":"2025-06-17T16:18:50.217994923+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":12,"current":23}
+{"time":"2025-06-17T16:18:51.485884344+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":13,"current":23}
+{"time":"2025-06-17T16:18:52.756575331+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":14,"current":23}
+{"time":"2025-06-17T16:18:54.027758174+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":15,"current":23}
+{"time":"2025-06-17T16:18:55.294098402+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":16,"current":23}
+{"time":"2025-06-17T16:18:56.571284168+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":17,"current":23}
+{"time":"2025-06-17T16:18:57.852352208+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":18,"current":23}
+{"time":"2025-06-17T16:18:59.131455974+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":19,"current":23}
+{"time":"2025-06-17T16:19:00.408152587+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":20,"current":23}
+{"time":"2025-06-17T16:19:01.686694825+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":21,"current":23}
+{"time":"2025-06-17T16:19:02.956751436+02:00","level":"WARN","msg":"handler: ignoring partial history record","step":22,"current":23}
+{"time":"2025-06-17T22:10:17.59483523+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-17T22:23:47.601122796+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-17T22:25:17.599185781+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-18T00:45:47.682298701+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-18T15:41:18.256534671+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": net/http: request canceled (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-18T17:07:35.763877005+02:00","level":"INFO","msg":"api: retrying HTTP error","status":502,"url":"https://api.wandb.ai/files/angnb-eth-z-rich/geofm-bench/rfq7l0o8/file_stream","body":"\n<html><head>\n<meta http-equiv=\"content-type\" content=\"text/html;charset=utf-8\">\n<title>502 Server Error</title>\n</head>\n<body text=#000000 bgcolor=#ffffff>\n<h1>Error: Server Error</h1>\n<h2>The server encountered a temporary error and could not complete your request.<p>Please try again in 30 seconds.</h2>\n<h2></h2>\n</body></html>\n"}
+{"time":"2025-06-19T00:30:18.594979805+02:00","level":"INFO","msg":"api: retrying error","error":"Post \"https://api.wandb.ai/graphql\": context deadline exceeded (Client.Timeout exceeded while awaiting headers)"}
+{"time":"2025-06-19T08:05:37.253381594+02:00","level":"INFO","msg":"Stopping system monitor"}
+{"time":"2025-06-19T08:05:37.255921835+02:00","level":"INFO","msg":"Stopped system monitor"}
+{"time":"2025-06-19T08:05:38.251006684+02:00","level":"INFO","msg":"handler: operation stats","stats":{"operations":[{"desc":"uploading output.log","runtime_seconds":0.526536887,"progress":"2.7MB/4.3MB"}],"total_operations":1}}
+{"time":"2025-06-19T08:05:38.649771661+02:00","level":"INFO","msg":"fileTransfer: Close: file transfer manager closed"}
+{"time":"2025-06-19T08:05:38.877992863+02:00","level":"INFO","msg":"stream: closing","id":"rfq7l0o8"}
+{"time":"2025-06-19T08:05:38.878025113+02:00","level":"INFO","msg":"handler: closed","stream_id":"rfq7l0o8"}
+{"time":"2025-06-19T08:05:38.878050293+02:00","level":"INFO","msg":"sender: closed","stream_id":"rfq7l0o8"}
+{"time":"2025-06-19T08:05:38.878035493+02:00","level":"INFO","msg":"writer: Close: closed","stream_id":"rfq7l0o8"}
+{"time":"2025-06-19T08:05:38.878503143+02:00","level":"INFO","msg":"stream: closed","id":"rfq7l0o8"}
