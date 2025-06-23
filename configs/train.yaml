@@ -1,5 +1,5 @@
 train: true
-work_dir: "" #"/cluster/scratch/user/" -> ADAPT IF RUNNING ON CLUSTER WITH LIMITED HOME DISK SPACE
+work_dir: "" #"/cluster/scratch/user/" #-> ADAPT IF RUNNING ON CLUSTER WITH LIMITED HOME DISK SPACE
 seed: 234
 use_wandb: false
 wandb_run_id: null

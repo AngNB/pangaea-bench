@@ -20,7 +20,7 @@ channel_embed: 256
 qkv_bias: True    # ScaleMAE -> CHECK
 
 input_bands:      # channel_groups=((0, 1, 2, 6), (3, 4, 5, 7), (8, 9)); 
-#Source: From the paper https://arxiv.org/pdf/2207.08051 => "Model configuration As not all of the 13 Sentinel-2 bands may be useful, in our experiments we drop bands B1, B9 and B10, which correspond to a spatial resolution of 60m. Of the remaining 10 bands, we form three groups: (i) RGB+NIR: B2, B3, B4, B8 (ii) Red Edge: B5, B6, B7, B8A (iii) SWIR: B11, B12. We choose this grouping to ensure each group has bands of the same spatial resolution and similar wavelength (see A.2.2, A.6).""
+#Source: From the paper https://arxiv.org/pdf/2207.08051
   optical:
     - B2          # 0
     - B3          # 1
