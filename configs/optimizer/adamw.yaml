@@ -1,3 +1,5 @@
+# Adapted to match SatMAE pr-training configurations, see thesis report
+
 _target_: torch.optim.AdamW
 params: null
 lr: 0.00005

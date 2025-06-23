@@ -1,7 +1,7 @@
 """
 AGBD Dataset for PANGAEA, task: Regression (Biomass Estimation)
 
-Adapted from the official AGBD GEDIDataset implementation (see https://github.com/ghjuliasialelli/AGBD/blob/d8e7287bbe787277d64f25806f3c991b9cec7076/Models/dataset.py#L32)
+Adapted from the official AGBD GEDI Dataset implementation (see https://github.com/ghjuliasialelli/AGBD/blob/d8e7287bbe787277d64f25806f3c991b9cec7076/Models/dataset.py#L32)
 This version is designed to be as close as possible to the proven AGBD code, with only minimal changes for PANGAEA config-driven initialization and output conventions.
 
 - All band order, and nodata logic is preserved.

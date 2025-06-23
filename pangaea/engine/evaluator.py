@@ -220,7 +220,7 @@ class SegEvaluator(Evaluator):
             
             
             # ------------------------------ VISUALIZATION ------------------------------
-            '''
+            ''' ADDED
             # SAVE SOME INTERMEDIATE RESULTS (ONLY PREDS THAT HAVE VALID VALUES ONLY AND IF WANDB IS ACTIVATED)
             if torch.all(torch.flatten(valid_mask)) and self.use_wandb and self.rank == 0:
                 # JUST SAVE IMAGES IN BATCH=0 AND ONLY FOR THE EPOCHS: (5, 10, 30, 60) ---OR--- IMAGES AFTER EVERY 5 EPOCHS IN THE FINALIZING VALIDATION ROUND (it has to be multiple of 5, since Evaluation only for all 5 epochs)
@@ -433,6 +433,8 @@ class RegEvaluator(Evaluator):
             else:
                 raise NotImplementedError((f"Inference mode {self.inference_mode} is not implemented."))
             
+            # ===================== CHANGED FROM ORIGINAL: IMPLEMENT SPARSE MSE, ADD METRICS AND VISUALIZATION - from here ... =====================
+            
             # for sparse mse, get central pixel assuming image height = image width and no rescaling
             pxl = int(logits.shape[-1]/2)
             
@@ -449,6 +451,7 @@ class RegEvaluator(Evaluator):
             absolute_error = (torch.abs(error_per_batch))
             mean_absolute_error += torch.mean(absolute_error)
 
+            # Define variable, so that metrics are only saved when testing, not when validating
             if self.testing_bool:
                 path_to_csv = os.path.join(self.exp_dir, f"test_metrics/metrics.csv")
                 with open(path_to_csv, 'a') as file:
@@ -497,7 +500,7 @@ class RegEvaluator(Evaluator):
                     wandb.log({f"batch_{batch_idx}_{model_name}_#{i}: MSE = {mse_to_print:.3f}": (img_pred, img_target, img_pred_masked, img_target_masked)})
 
             # ------------------------------ VISUALIZATION ------------------------------
-
+                        
 
         torch.distributed.all_reduce(mse, op=torch.distributed.ReduceOp.SUM)
         mse = mse / len(self.val_loader)
@@ -508,6 +511,8 @@ class RegEvaluator(Evaluator):
 
         metrics = {"MSE": mse.item(), "RMSE": torch.sqrt(mse).item()}
         self.log_metrics(metrics, other_metrics)
+        # ===================== until here ... - CHANGED FROM ORIGINAL: IMPLEMENT SPARSE MSE, AND VISUALIZATION - from here =====================
+
 
         used_time = time.time() - t
 
@@ -524,4 +529,5 @@ class RegEvaluator(Evaluator):
         self.logger.info(header + mse + rmse)
 
         if self.use_wandb and self.rank == 0:
+            # ADAPTED TO LOG ADDED METRICS, SEE ABOVE
             wandb.log({f"{self.split}_MSE_(mean_over_test_batches)": metrics["MSE"], f"{self.split}_RMSE_(mean_over_test_batches)": metrics["RMSE"], f"{self.split}_MAE_(mean_over_test_batches)": other_metrics["MAE"], f"{self.split}_ME_(mean_over_test_batches)": other_metrics["ME"]})

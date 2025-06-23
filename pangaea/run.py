@@ -230,8 +230,6 @@ def main(cfg: DictConfig) -> None:
         )
 
         logger.info("Built {} dataset.".format(cfg.dataset.dataset_name))
-        #print("random image before dataloader:", val_dataset[6713]["image"]["optical"][3,:,:1,:6])
-        #print("shape of random target before dataloader:", val_dataset[1]["target"].shape)
 
         logger.info(
             f"Total number of train patches: {len(train_dataset)}\n"

@@ -190,11 +190,11 @@ class Trainer:
             if self.use_wandb and self.rank == 0:
                 self.wandb.log(
                     {
-                        "Train_MSE_(Loss_per_epoch_per_batch)": loss.item(),
+                        "Train_MSE_(Loss_per_epoch_per_batch)": loss.item(),                        # CHANGED: SPECIFY WHAT IS LOGGED
                         "learning_rate_per_batch": self.optimizer.param_groups[0]["lr"],
                         "epoch": epoch,
                         **{
-                            f"Train_{k}_(running_average)": v.avg
+                            f"Train_{k}_(running_average)": v.avg                                   # CHANGED: SPECIFY WHAT IS LOGGED
                             for k, v in self.training_metrics.items()
                         },
                     },

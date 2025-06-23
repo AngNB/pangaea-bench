@@ -778,6 +778,7 @@ class ResizeToEncoder(Resize):
         size = meta["encoder_input_size"]
         super().__init__(size, interpolation, antialias, resize_target, **meta)
 
+### ADDED AS PART OF AGBD & SATMAE INTEGRATION => SatMAE data was preprocessed with flip, p=1 (chosen); please refer to thesis report for details
 class HorizontalFlip(BasePreprocessor):
     def __init__(
         self,

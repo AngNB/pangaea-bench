@@ -1,4 +1,4 @@
-# Needed for resizing
+# Added as part of AGBD Integration, see thesis report
 
 train:
     _target_: pangaea.engine.data_preprocessor.Preprocessor

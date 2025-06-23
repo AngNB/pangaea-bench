@@ -1,11 +1,14 @@
+# CONFIGURATION FILE ADDED AS PART OF SATMAE (BASE) INTEGRATION; SOURCE: https://arxiv.org/abs/2207.08051, https://sustainlab-group.github.io/SatMAE/
+### COPY PASTED FROM GITHUB REPO FROM SATMAE - REMOVED/COMMENTED PARTS RELATED TO DECODER SINCE ONLY ENCODER NEEDED
+### Please refer to CONTRIBUTING.md for details here https://github.com/VMarsocci/pangaea-bench
+
 from functools import partial
 from logging import Logger
 from pathlib import Path
 
 import numpy
-### COPY PASTED FROM GITHUB REPO FROM SATMAE - REMOVED/COMMENTED PARTS RELATED TO DECODER SINCE ONLY ENCODER NEEDED; DECODER TAILORED TO TASK
-### ESSENTIALLY 2 CLASSES: ONE IS CALLED AS SATMAE => ""
 
+#=========== Copied from https://sustainlab-group.github.io/SatMAE/ ===========
 
 # --------------------------------------------------------
 # References:
